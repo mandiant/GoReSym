@@ -1,37 +1,29 @@
 # GoReSym
-Go symbol parser. This is designed to extract binary metadata (arch, os, endianness, version, etc), functions (start,end,name,classification), filename/line number information when it exists, and structures/embedded types. This library is cross platform and based directly on the open source GO code from https://github.com/golang/go/tree/master/src/debug/gosym as well as other internal runtime code stitched together as needed. 
+GoReSym is a Go symbol parser that extracts program metadata (such as CPU architecture, OS, endianness, compiler version, etc), function metadata (start & end addresses, names, sources), filename and line number metadata, and embedded structures and types. This cross platform program is based directly on the [open source Go compiler](https://github.com/golang/go/tree/master/src/debug/gosym) and runtime code. 
 
-There are modifications to the original go runtime code to handle:
+The upstream Go runtime code is extended to handle:
 * stripped binaries
 * malformed unpacked binaries, such as from UPX
-* binaries which split single section data cross multiple sections
-* location of the moduledata structure
+* binaries that split single data ranges across multiple sections
+* the location of the `moduledata` structure
 
-# Version Support
-* all combinations of x86/x64 macho/elf/exe big/little endian
-* pclntab parsing: >= Go 1.2
-* moduledata location: >= Go 1.2
-* moduledata type parsing: >= Go 1.5
 
-The moduledata table used to parse types doesn't exist prior to go 1.5, and will never be supported by this library.
+# Usage
+You can download pre-built GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/) or build from source with a recent Go compiler:
 
-# Use
 ```
 go build
-./GoReSym -d -p -t <binary path>
 ```
 
-* Optional -d (default) flag will print standard Go packages in addition to user packages.
-* Optional -p (paths) flag will print any file paths embedded in the pclntab.
-* Optional -t (types) flag will print Go type names.
-* Optional -m <virtual address> (manual) flag will dump the RTYPE structure recursively at the given virtual address
-* Optional -v <version string> flag will override automated version detection and use the provided version. This is needed for some stripped binaries. Type parsing will fail if the version is not accurate.
-* Optional -human flag will print a flat text listing instead of JSON. Especially useful when printing structure and interface types.
+Invoke GoReSym like this:
 
-To import this information into IDA Pro there is a small script to read the json output of this tool and label symbols. Please see the IDAPython directory.
-
-Output:
 ```
+GoReSym.exe -t -d -p /path/to/input.exe
+```
+
+In this example, we ask GoReSym to recover type names (`-t`), user package names, standard Go package names (`-d`), and input file paths (`-p`) embedded within the file `/path/to/input.exe`. The output looks like this:
+
+```json
 {
     "Version": "1.14.15",
     "BuildId": "Zb9QmokKTiOUgHKmaIwz/wd2rtE3W9PN-um1Ocdzh/qTdqcTY_jVajHy_-TtYv/Z_kJu9M77OjfijEiHMcF",
@@ -71,29 +63,60 @@ Output:
 }
 ```
 
-# Contributions
-The source code is copied from `/internal` Go package sources. Due to the way go works we need to remove the `/internal` path from the file tree to use these internal sources. What this results in is lots of copying of internal Go files, where the directory tree is mostly intact but many imports have their `/internal` paths replaced with `github.com/stevemk14ebr/GoReSym/`. Many internal structures are also modified to export fields and method, this is not great, but it's not easily avoidable. 
+Here are all the available flags:
 
-With that, most of the modified logic exists in `/objfile`, and the file `objfile/internals` defines the reversed internal go structures that are parsed out. When updating this repository with new code from the upstream Go source care must be taken to keep the current modifications intact. I am open to suggestions on how to better structure this project to avoid these issues while still compiling with the typical `go build`, there is a previous discussion here on the issues leading to this: https://github.com/golang/go/issues/46792.
+* `-d` ("default", optional) flag will print standard Go packages in addition to user packages.
+* `-p` ("paths", optional) flag will print any file paths embedded in the `pclntab`.
+* `-t` ("types", optional) flag will print Go type names.
+* `-m <virtual address>` ("manual", optional) flag will dump the `RTYPE` structure recursively at the given virtual address
+* `-v <version string>` ("version", optional) flag will override automated version detection and use the provided version. This is needed for some stripped binaries. Type parsing will fail if the version is not accurate.
+* `-human` (optional) flag will print a flat text listing instead of JSON. Especially useful when printing structure and interface types.
+
+To import this information into IDA Pro you can run the script found in [https://github.com/mandiant/GoReSym/blob/master/IDAPython/goresym_rename.py](IDAPython/goresym_rename.py). It will read a json file produced by GoReSym and set symbols/labels in IDA.
+    
+# Version Support
+
+As the Go compiler and runtime have changed, so have the embedded metadata structures. GoReSym supports the following combinations of Go releases & metadata:
+
+* all combinations of Intel x86/x64  𝒙  MACH-O/ELF/PE  𝒙  big/little endian
+* `pclntab` parsing: >= Go 1.2
+* `moduledata` location: >= Go 1.2
+* `moduledata` type parsing: >= Go 1.5
+
+The `moduledata` table used to extract types doesn't exist prior to Go 1.5, so this library will never support extracting types from very old Go versions.
+
+This library current handles legacy `pclntab` (pre Go 1.2), 1.2, 1.16, and 1.18.
+
+# Contributions
+Much of the source code from GoReSym is copied from the upstream Go compiler source directory  `/internal`. To make this work, we've had to massage the source a bit. If you want to contribute to GoReSym, read on so we can explain this import process.
+
+Due to the way Go packages work, we needed to remove the `/internal` path from the source file tree. This resulted in a lot of copying of internal Go files, where the directory tree is mostly intact but with small changes to many files' imports: references to `/internal` paths were replaced with `github.com/mandiant/GoReSym/`. 
+
+We also modified many internal structures to export fields and method. These are not exported by upstream Go because users should not rely upon them; however, the purpose of this tool to extract internal information, so we're taking on the task of maintaining these structures. Its not a great situation, but it's not easily avoidable. 
+
+Beyond the trivial changes, new logic exists in `/objfile`. For example, the file `objfile/internals` defines the reversed internal Go structures that GoReSym parses. If you update this repository, you must take care to keep these modifications intact. Its probably better to manually merge in commits from upstream rather than copying upstream files wholesale.
+
+I am open to suggestions on how to better structure this project to avoid these issues while still compiling with the typical `go build`. There is a previous discussion involving Go maintainers [here](https://github.com/golang/go/issues/46792).
 
 # References
-* pclntab specification: golang.org/s/go12symtab (https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub)
-* pclntab magics: https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169
-* objfile bug(s): https://github.com/golang/go/issues/42954, https://github.com/golang/go/issues/47981, https://github.com/golang/go/issues/47852
-* buildID legacy issue: https://github.com/golang/go/issues/50809
-
-This library current handles legacy pclntab (pre go 1.2), 1.2, 1.16, and 1.18
+* `pclntab` specification: [golang.org/s/go12symtab](https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub)
+* `pclntab` magics: [pclntab.go#L169](https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169)
+* `objfile` bug(s): 
+  *  [golang/go#42954](https://github.com/golang/go/issues/42954)
+  *  [golang/go#47981](https://github.com/golang/go/issues/47981)
+  *  [golang/go#47852](https://github.com/golang/go/issues/47852)
+* `buildID` legacy issue: [](https://github.com/golang/go/issues/50809)
 
 # Changes
-* pcln() functions in objfile/<fileformat> have been extended to support byte scanning the pclntab magic
-* file format parsers in /debug/<fileformat> have added routines such as DataAfterSection to support the signature scan
-* debug/gosym/symtab.go's walksymtab has an added check to bail early when the optional symtab section is empty
-* capitalization of many members and internal structs were changed to capital, so that they could be used as public exported symbols. Go uses capitalization to declare public vs private. The changes here are too many to enumerate
-* objfile/objfile.go's PCLineTable() has had goobj liner support removed. This object time is not common to see, and the liner table cannot be signatured for, so goobj file support is removed.
-* extra sanity checks around loadPeTable (and other format variants) to avoid panic when symbols are present but malicious modified to be invalid (https://github.com/golang/go/issues/47981)
+* `pcln()` functions in `objfile/<fileformat>` have been extended to support byte scanning the `pclntab` magic
+* file format parsers in `/debug/<fileformat>` have added routines such as `DataAfterSection` to support the signature scan
+* `debug/gosym/symtab.go`'s `walksymtab` has an added check to bail early when the optional `symtab` section is empty
+* many members and internal structs have been exported. Go uses capitalization to declare public vs private. The changes here are too many to enumerate
+* `objfile/objfile.go`'s `PCLineTable()` has had `goobj` liner support removed. This object time is not common to see, and the liner table cannot be signatured for, so `goobj` file support is removed.
+* extra sanity checks around `loadPeTable` (and other format variants) to avoid panic when symbols are present but malicious modified to be invalid (ref: [golang/go#47981](https://github.com/golang/go/issues/47981))
 * the signatures of some internal functions have been modified to provide lower level access to information such as section addresses and offsets. 
-* read_memory routines for supported file formats implemented to read file data by virtual address
-* moduledata scan routines introduced to help locate moduledata in support of scanning for types and interfaces (via typelinks)
+* `read_memory` routines for supported file formats implemented to read file data by virtual address
+* `moduledata` scan routines introduced to help locate moduledata in support of scanning for types and interfaces (via `typelinks`)
     
 # License
 MIT
