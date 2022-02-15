@@ -1,0 +1,18 @@
+// https://github.com/golang/go/blob/master/src/reflect/type.go
+typedef uint8_t tflag;
+typedef int32_t nameOff;
+typedef int32_t typeOff;
+
+struct rtype {
+	size_t size;       
+	size_t ptrdata;    
+	uint32_t hash;
+	tflag tflag;
+	uint8_t align;
+	uint8_t fieldAlign;
+	uint8_t kind;
+	void* equal;
+	void* gcdata;
+	nameOff str;
+	typeOff ptrToThis;
+}
