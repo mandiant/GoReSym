@@ -94,3 +94,6 @@ This library current handles legacy pclntab (pre go 1.2), 1.2, 1.16, and 1.18
 * the signatures of some internal functions have been modified to provide lower level access to information such as section addresses and offsets. 
 * read_memory routines for supported file formats implemented to read file data by virtual address
 * moduledata scan routines introduced to help locate moduledata in support of scanning for types and interfaces (via typelinks)
+    
+# License
+MIT
