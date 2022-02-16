@@ -1,0 +1,55 @@
+struct moduledata
+{
+  GoSlice pclntable;
+  GoSlice ftab;
+  GoSlice filetab;
+  void *findfunctab;
+  void *minpc;
+  void *maxpc;
+  void *text;
+  void *etext;
+  void *noptrdata;
+  void *enoptrdata;
+  void *data;
+  void *edata;
+  void *bss;
+  void *ebss;
+  void *noptrbss;
+  void *enoptrbss;
+  void *end;
+  void *gcdata;
+  void *gcbss;
+  void *types;
+  void *etypes;
+  
+  GoSlice typelinks;
+  GoSlice itablinks;
+  
+  GoString modulename;
+  GoSlice modulehashes;
+  
+  GoBitVector gcdatamask;
+  GoBitVector gcbssmask;
+  void *typemap;
+  
+  moduledata *next;
+};
+
+// https://github.com/golang/go/blob/master/src/reflect/type.go
+typedef uint8_t tflag;
+typedef int32_t nameOff;
+typedef int32_t typeOff;
+
+struct rtype {
+	size_t size;       
+	size_t ptrdata;    
+	uint32_t hash;
+	tflag tflag;
+	uint8_t align;
+	uint8_t fieldAlign;
+	uint8_t kind;
+	void* alg; // ptr to struct holding hash and equal functions
+	void* gcdata;
+	nameOff str;
+	typeOff ptrToThis;
+}

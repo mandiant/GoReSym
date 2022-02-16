@@ -1,0 +1,63 @@
+struct GoSlice
+{
+  void *data;
+  size_t len;
+  size_t capacity;
+};
+
+struct GoString
+{
+  char *data;
+  size_t len;
+};
+
+struct GoBitVector
+{
+  uint32_t bitnum;
+  char *bytedata;
+};
+
+struct moduledata
+{
+  GoSlice pclntable;
+  GoSlice ftab;
+  GoSlice filetab;
+  void *findfunctab;
+  void *minpc;
+  void *maxpc;
+  void *text;
+  void *etext;
+  void *noptrdata;
+  void *enoptrdata;
+  void *data;
+  void *edata;
+  void *bss;
+  void *ebss;
+  void *noptrbss;
+  void *enoptrbss;
+  void *end;
+  void *gcdata;
+  void *gcbss;
+  void *types;
+  void *etypes;
+  GoSlice textsectmap;
+  GoSlice typelinks;
+  GoSlice itablinks;
+  GoSlice ptab;
+  GoString pluginpath;
+  GoSlice pkghashes;
+  GoString modulename;
+  GoSlice modulehashes;
+  char hasmain;
+  GoBitVector gcdatamask;
+  GoBitVector gcbssmask;
+  void *typemap;
+  char badload;
+  moduledata *next;
+};
+
+// function table
+struct functab {
+  void* entryoffset; // relative to runtime.text (i.e VA)
+  void* funcoffset; // relative to ftab table start
+}
