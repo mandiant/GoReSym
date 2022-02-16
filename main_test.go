@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 /*Copyright (C) 2022 Mandiant, Inc. All Rights Reserved.*/ 
-=======
-/*Copyright (C) 2022 Mandiant, Inc. All Rights Reserved.*/
->>>>>>> 4feec1a (Add licensing in headers)
 package main
 
 import (
