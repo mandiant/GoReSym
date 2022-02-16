@@ -105,7 +105,7 @@ I am open to suggestions on how to better structure this project to avoid these 
   *  [golang/go#42954](https://github.com/golang/go/issues/42954)
   *  [golang/go#47981](https://github.com/golang/go/issues/47981)
   *  [golang/go#47852](https://github.com/golang/go/issues/47852)
-* `buildID` legacy issue: [](https://github.com/golang/go/issues/50809)
+* `buildID` legacy bug: [golang/go#50809](https://github.com/golang/go/issues/50809)
 
 # Changes
 * `pcln()` functions in `objfile/<fileformat>` have been extended to support byte scanning the `pclntab` magic
