@@ -64,5 +64,3 @@ if hints['ModuleMeta'] is not None:
     va = modmeta['VA']
     if va is not None and va != 0:
         idaapi.set_name(va, 'runtime_firstmoduledata', idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
-
->>>>>>> 4feec1a (Add licensing in headers)
