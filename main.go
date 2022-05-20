@@ -261,7 +261,7 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 
 func printForHuman(metadata ExtractMetadata) {
 	fmt.Println("----GoReSym----")
-	fmt.Println("Some information is ommitted, for a full listing do not use human view")
+	fmt.Println("Some information is omitted, for a full listing do not use human view")
 	fmt.Printf("%-20s %s\n", "Version:", metadata.Version)
 	fmt.Printf("%-20s %s\n", "Arch:", metadata.Arch)
 	fmt.Printf("%-20s %s\n", "OS:", metadata.OS)
@@ -373,7 +373,7 @@ func main() {
 	printTypes := flag.Bool("t", false, "Print types automatically, enumerate typelinks and itablinks")
 	typeAddress := flag.Int("m", 0, "Manually parse the RTYPE at the provided virtual address, disables automated enumeration of moduledata typelinks itablinks")
 	versionOverride := flag.String("v", "", "Override the automated version detection, ex: 1.17. If this is wrong, parsing may fail or produce nonsense")
-	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is ommited for clarity")
+	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is omitted for clarity")
 
 	flag.Parse()
 
