@@ -117,8 +117,7 @@ ExitScan:
 
 					var candidate PclntabCandidate
 					candidate.pclntab = pclntab
-					candidate.secStart = uint64(sec.Addr)
-					candidate.pclntabVA = candidate.secStart + uint64(pclntab_idx)
+					candidate.pclntabVA = uint64(sec.Addr) + uint64(pclntab_idx)
 
 					candidates = append(candidates, candidate)
 					// we must scan all signature for all sections. DO NOT BREAK
@@ -130,8 +129,7 @@ ExitScan:
 			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
 				var candidate PclntabCandidate
 				candidate.pclntab = pclntab
-				candidate.secStart = uint64(sec.Addr)
-				candidate.pclntabVA = candidate.secStart + uint64(pclntab_idx)
+				candidate.pclntabVA = uint64(sec.Addr) + uint64(pclntab_idx)
 
 				candidates = append(candidates, candidate)
 				break ExitScan

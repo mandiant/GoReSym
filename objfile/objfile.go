@@ -23,7 +23,6 @@ import (
 )
 
 type PclntabCandidate struct {
-	secStart  uint64
 	pclntabVA uint64
 	pclntab   []byte
 	symtab    []byte // optional
@@ -206,8 +205,25 @@ func (e *Entry) PCLineTable() (*gosym.Table, uint64, error) {
 		return nil, 0, err
 	}
 
+	// resolve text start by either symbol or section name
+	textStart := uint64(0)
+	syms, err := e.raw.symbols()
+	if err == nil {
+		for _, s := range syms {
+			if s.Name == "runtime.text" {
+				textStart = s.Addr
+				break
+			}
+		}
+	} else {
+		secBase, _, err := e.Text()
+		if err == nil {
+			textStart = secBase
+		}
+	}
+
 	for _, candidate := range candidates {
-		table, err := gosym.NewTable(candidate.symtab, gosym.NewLineTable(candidate.pclntab, candidate.secStart))
+		table, err := gosym.NewTable(candidate.symtab, gosym.NewLineTable(candidate.pclntab, textStart))
 		if err != nil || table.Go12line == nil {
 			continue
 		}
