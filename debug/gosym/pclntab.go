@@ -74,7 +74,7 @@ type LineTable struct {
 	Binary      binary.ByteOrder
 	Quantum     uint32
 	Ptrsize     uint32
-	textStart   uint64 // address of runtime.text symbol (1.18+)
+	textStart   uintptr // address of runtime.text symbol (1.18+)
 	funcnametab []byte
 	cutab       []byte
 	funcdata    []byte
@@ -269,7 +269,7 @@ func (t *LineTable) parsePclnTab() {
 	case ver118:
 		t.nfunctab = uint32(offset(0))
 		t.nfiletab = uint32(offset(1))
-		t.textStart = t.PC // use the start PC instead of reading from the table, which may be unrelocated
+		t.textStart = uintptr(offset(2))
 		t.funcnametab = data(3)
 		t.cutab = data(4)
 		t.filetab = data(5)
@@ -422,7 +422,7 @@ func (f funcTab) Count() int {
 func (f funcTab) pc(i int) uint64 {
 	u := f.uint(f.functab[2*i*f.sz:])
 	if f.Version >= ver118 {
-		u += f.textStart
+		u += uint64(f.textStart)
 	}
 	return u
 }
@@ -464,7 +464,7 @@ func (f *funcData) entryPC() uint64 {
 	if f.t.Version >= ver118 {
 		// TODO: support multiple text sections.
 		// See runtime/symtab.go:(*moduledata).textAddr.
-		return uint64(f.t.Binary.Uint32(f.data)) + f.t.textStart
+		return uint64(f.t.Binary.Uint32(f.data)) + uint64(f.t.textStart)
 	}
 	return f.t.uintptr(f.data)
 }
