@@ -205,7 +205,7 @@ func (e *Entry) PCLineTable() (*gosym.Table, uint64, error) {
 		return nil, 0, err
 	}
 
-	// resolve text start by either symbol or section name
+	// try to resolve via symbol
 	textStart := uint64(0)
 	syms, err := e.raw.symbols()
 	if err == nil {
@@ -215,7 +215,10 @@ func (e *Entry) PCLineTable() (*gosym.Table, uint64, error) {
 				break
 			}
 		}
-	} else {
+	}
+
+	// that may have failed, use section base directly
+	if textStart == 0 {
 		secBase, _, err := e.Text()
 		if err == nil {
 			textStart = secBase
