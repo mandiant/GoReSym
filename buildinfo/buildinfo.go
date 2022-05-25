@@ -261,8 +261,10 @@ func (x *elfExe) DataStart() uint64 {
 			return s.Addr
 		}
 	}
+
 	for _, p := range x.f.Progs {
-		if p.Type == elf.PT_LOAD && p.Flags&(elf.PF_X|elf.PF_W) == elf.PF_W {
+		flags := elf.ProgFlag(elf.PF_R | elf.PF_W)
+		if p.Type == elf.PT_LOAD && (p.Flags&flags) == flags {
 			return p.Vaddr
 		}
 	}
@@ -317,8 +319,8 @@ func (x *peExe) DataStart() uint64 {
 		IMAGE_SCN_ALIGN_32BYTES          = 0x600000
 	)
 	for _, sect := range x.f.Sections {
-		if sect.VirtualAddress != 0 && sect.Size != 0 &&
-			sect.Characteristics&^IMAGE_SCN_ALIGN_32BYTES == IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE {
+		flags := uint32(IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE)
+		if sect.VirtualAddress != 0 && (sect.Characteristics&flags) == flags {
 			return uint64(sect.VirtualAddress) + x.imageBase()
 		}
 	}
@@ -397,5 +399,8 @@ func (x *xcoffExe) ReadData(addr, size uint64) ([]byte, error) {
 }
 
 func (x *xcoffExe) DataStart() uint64 {
-	return x.f.SectionByType(xcoff.STYP_DATA).VirtualAddress
+	if s := x.f.SectionByType(xcoff.STYP_DATA); s != nil {
+		return s.VirtualAddress
+	}
+	return 0
 }
