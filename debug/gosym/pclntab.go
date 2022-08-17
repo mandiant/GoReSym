@@ -15,6 +15,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -27,6 +28,7 @@ const (
 	ver12
 	ver116
 	ver118
+	ver120
 )
 
 func (v version) String() string {
@@ -41,6 +43,8 @@ func (v version) String() string {
 		return "1.16"
 	case ver118:
 		return "1.18"
+	case ver120:
+		return "1.20"
 	default:
 		return fmt.Sprintf("ERROR Unknown ID number %d", int(v))
 	}
@@ -141,7 +145,7 @@ func (t *LineTable) slice(pc uint64) *LineTable {
 //
 // Deprecated: Use Table's PCToLine method instead.
 func (t *LineTable) PCToLine(pc uint64) int {
-	if t.isGo12() {
+	if t.isGo12("") {
 		return t.go12PCToLine(pc)
 	}
 	_, _, line := t.parse(pc, -1)
@@ -153,7 +157,7 @@ func (t *LineTable) PCToLine(pc uint64) int {
 //
 // Deprecated: Use Table's LineToPC method instead.
 func (t *LineTable) LineToPC(line int, maxpc uint64) uint64 {
-	if t.isGo12() {
+	if t.isGo12("") {
 		return 0
 	}
 	_, pc, line1 := t.parse(maxpc, line)
@@ -184,8 +188,8 @@ func NewLineTable(data []byte, text uint64) *LineTable {
 // are expected to have that recovery logic.
 
 // isGo12 reports whether this is a Go 1.2 (or later) symbol table.
-func (t *LineTable) isGo12() bool {
-	t.parsePclnTab()
+func (t *LineTable) isGo12(versionOverride string) bool {
+	t.parsePclnTab(versionOverride)
 	return t.Version >= ver12
 }
 
@@ -193,6 +197,7 @@ const (
 	go12magic  = 0xfffffffb
 	go116magic = 0xfffffffa
 	go118magic = 0xfffffff0
+	go120magic = 0xfffffff1
 )
 
 // uintptr returns the pointer-sized value encoded at b.
@@ -205,7 +210,7 @@ func (t *LineTable) uintptr(b []byte) uint64 {
 }
 
 // parsePclnTab parses the pclntab, setting the version.
-func (t *LineTable) parsePclnTab() {
+func (t *LineTable) parsePclnTab(versionOverride string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.Version != verUnknown {
@@ -249,10 +254,40 @@ func (t *LineTable) parsePclnTab() {
 		t.Binary, possibleVersion = binary.LittleEndian, ver118
 	case beMagic == go118magic:
 		t.Binary, possibleVersion = binary.BigEndian, ver118
+	case leMagic == go120magic:
+		t.Binary, possibleVersion = binary.LittleEndian, ver120
+	case beMagic == go120magic:
+		t.Binary, possibleVersion = binary.BigEndian, ver120
 	default:
 		return
 	}
 	t.Version = possibleVersion
+
+	if len(versionOverride) > 0 {
+		if strings.Contains(versionOverride, "1.20") {
+			t.Version = ver120
+		} else if strings.Contains(versionOverride, "1.19") {
+			t.Version = ver118
+		} else if strings.Contains(versionOverride, "1.18") {
+			t.Version = ver118
+		} else if strings.Contains(versionOverride, "1.17") {
+			t.Version = ver116
+		} else if strings.Contains(versionOverride, "1.16") {
+			t.Version = ver116
+		} else if strings.Contains(versionOverride, "1.15") {
+			t.Version = ver12
+		} else if strings.Contains(versionOverride, "1.14") {
+			t.Version = ver12
+		} else if strings.Contains(versionOverride, "1.13") {
+			t.Version = ver12
+		} else if strings.Contains(versionOverride, "1.12") {
+			t.Version = ver12
+		} else if strings.Contains(versionOverride, "1.11") {
+			t.Version = ver11
+		} else {
+			t.Version = ver11
+		}
+	}
 
 	// quantum and ptrSize are the same between 1.2, 1.16, and 1.18
 	t.Quantum = uint32(t.Data[6])
@@ -265,8 +300,8 @@ func (t *LineTable) parsePclnTab() {
 		return t.Data[offset(word):]
 	}
 
-	switch possibleVersion {
-	case ver118:
+	switch t.Version {
+	case ver118, ver120:
 		t.nfunctab = uint32(offset(0))
 		t.nfiletab = uint32(offset(1))
 		t.textStart = t.PC // use the start PC instead of reading from the table, which may be unrelocated
@@ -326,11 +361,12 @@ func (t *LineTable) go12Funcs() []Func {
 		f.LineTable = t
 		f.FrameSize = int(info.deferreturn())
 		syms[i] = Sym{
-			Value:  f.Entry,
-			Type:   'T',
-			Name:   t.funcName(info.nameoff()),
-			GoType: 0,
-			Func:   f,
+			Value:     f.Entry,
+			Type:      'T',
+			Name:      t.funcName(info.nameoff()),
+			GoType:    0,
+			Func:      f,
+			GoVersion: t.Version,
 		}
 		f.Sym = &syms[i]
 	}
@@ -547,7 +583,7 @@ func (t *LineTable) findFileLine(entry uint64, filetab, linetab uint32, filenum,
 	fileStartPC := filePC
 	for t.step(&fp, &filePC, &fileVal, filePC == entry) {
 		fileIndex := fileVal
-		if t.Version == ver116 || t.Version == ver118 {
+		if t.Version == ver116 || t.Version == ver118 || t.Version == ver120 {
 			fileIndex = int32(t.Binary.Uint32(cutab[fileVal*4:]))
 		}
 		if fileIndex == filenum && fileStartPC < filePC {
@@ -646,7 +682,7 @@ func (t *LineTable) go12LineToPC(file string, line int) (pc uint64) {
 		entry := f.entryPC()
 		filetab := f.pcfile()
 		linetab := f.pcln()
-		if t.Version == ver116 || t.Version == ver118 {
+		if t.Version == ver116 || t.Version == ver118 || t.Version == ver120 {
 			cutab = t.cutab[f.cuOffset()*4:]
 		}
 		pc := t.findFileLine(entry, filetab, linetab, int32(filenum), int32(line), cutab)

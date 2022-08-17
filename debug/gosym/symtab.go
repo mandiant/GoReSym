@@ -28,7 +28,8 @@ type Sym struct {
 	Name   string
 	GoType uint64
 	// If this symbol is a function symbol, the corresponding Func
-	Func *Func
+	Func      *Func
+	GoVersion version
 }
 
 // Static reports whether this symbol is static (not visible outside its file).
@@ -57,9 +58,16 @@ func (s *Sym) nameWithoutInst() string {
 func (s *Sym) PackageName() string {
 	name := s.nameWithoutInst()
 
-	// A prefix of "type." and "go." is a compiler-generated symbol that doesn't belong to any package.
-	// See variable reservedimports in cmd/compile/internal/gc/subr.go
-	if strings.HasPrefix(name, "go.") || strings.HasPrefix(name, "type.") {
+	// Since go1.20, a prefix of "type:" and "go:" is a compiler-generated symbol,
+	// they do not belong to any package.
+	//
+	// See cmd/compile/internal/base/link.go:ReservedImports variable.
+	if s.GoVersion >= ver120 && (strings.HasPrefix(name, "go:") || strings.HasPrefix(name, "type:")) {
+		return ""
+	}
+
+	// For go1.18 and below, the prefix are "type." and "go." instead.
+	if s.GoVersion <= ver118 && (strings.HasPrefix(name, "go.") || strings.HasPrefix(name, "type.")) {
 		return ""
 	}
 
@@ -326,7 +334,7 @@ func walksymtab(data []byte, fn func(sym) error) error {
 // NewTable decodes the Go symbol table (the ".gosymtab" section in ELF),
 // returning an in-memory representation.
 // Starting with Go 1.3, the Go symbol table no longer includes symbol data.
-func NewTable(symtab []byte, pcln *LineTable) (*Table, error) {
+func NewTable(symtab []byte, pcln *LineTable, versionOverride string) (*Table, error) {
 	var n int
 	err := walksymtab(symtab, func(s sym) error {
 		n++
@@ -337,7 +345,7 @@ func NewTable(symtab []byte, pcln *LineTable) (*Table, error) {
 	}
 
 	var t Table
-	if pcln.isGo12() {
+	if pcln.isGo12(versionOverride) {
 		t.Go12line = pcln
 	}
 	fname := make(map[uint16]string)
@@ -352,6 +360,7 @@ func NewTable(symtab []byte, pcln *LineTable) (*Table, error) {
 		ts.Type = s.typ
 		ts.Value = s.value
 		ts.GoType = s.gotype
+		ts.GoVersion = pcln.Version
 		switch s.typ {
 		default:
 			// rewrite name to use . instead of · (c2 b7)

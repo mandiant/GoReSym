@@ -168,6 +168,16 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		}
 	}
 
+	tab, tabva, err := file.PCLineTable(versionOverride)
+	if err != nil {
+		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
+	}
+
+	if tab.Go12line == nil {
+		log.Fatalf("pclntab read, but is nil")
+		return ExtractMetadata{}, fmt.Errorf("read pclntab, but parsing failed. The file may not be fully unpacked or corrupted: %w", err)
+	}
+
 	if len(versionOverride) > 0 {
 		extractMetadata.Version = versionOverride
 	}
@@ -180,16 +190,6 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 
 		// go1.18-2d1d548
 		extractMetadata.Version = strings.Split(extractMetadata.Version+"-", "-")[0]
-	}
-
-	tab, tabva, err := file.PCLineTable()
-	if err != nil {
-		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
-	}
-
-	if tab.Go12line == nil {
-		log.Fatalf("pclntab read, but is nil")
-		return ExtractMetadata{}, fmt.Errorf("read pclntab, but parsing failed. The file may not be fully unpacked or corrupted: %w", err)
 	}
 
 	extractMetadata.TabMeta.CpuQuantum = tab.Go12line.Quantum

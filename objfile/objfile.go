@@ -111,8 +111,8 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable() (*gosym.Table, uint64, error) {
-	return f.entries[0].PCLineTable()
+func (f *File) PCLineTable(versionOverride string) (*gosym.Table, uint64, error) {
+	return f.entries[0].PCLineTable(versionOverride)
 }
 
 func (f *File) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
@@ -188,7 +188,7 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable() (*gosym.Table, uint64, error) {
+func (e *Entry) PCLineTable(versionOverride string) (*gosym.Table, uint64, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
@@ -226,7 +226,7 @@ func (e *Entry) PCLineTable() (*gosym.Table, uint64, error) {
 	}
 
 	for _, candidate := range candidates {
-		table, err := gosym.NewTable(candidate.symtab, gosym.NewLineTable(candidate.pclntab, textStart))
+		table, err := gosym.NewTable(candidate.symtab, gosym.NewLineTable(candidate.pclntab, textStart), versionOverride)
 		if err != nil || table.Go12line == nil {
 			continue
 		}
