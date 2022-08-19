@@ -117,6 +117,7 @@ Ignoring some trivial changes, most new logic exists in `/objfile`. For example,
 * the signatures of some internal functions have been modified to provide lower level access to information such as section addresses and offsets. 
 * `read_memory` routines for supported file formats implemented to read file data by virtual address
 * `moduledata` scan routines introduced to help locate moduledata in support of scanning for types and interfaces (via `typelinks`)
+* `readStringTable` has size guards added for invalid symbol tables. Parsing failures are ignored as well.
     
 # License
 MIT
