@@ -85,7 +85,7 @@ As the Go compiler and runtime have changed, so have the embedded metadata struc
 
 The `moduledata` table used to extract types doesn't exist prior to Go 1.5, so this library will never support extracting types from very old Go versions.
 
-This library current handles legacy `pclntab` (pre Go 1.2), 1.2, 1.16, and 1.18.
+This library current handles legacy `pclntab` (pre Go 1.2), 1.2, 1.16, 1.18, 1.19, and 1.20.
 
 # Contributions
 Much of the source code from GoReSym is copied from the upstream Go compiler source directory  `/internal`. To make this work, we've had to massage the source a bit. If you want to contribute to GoReSym, read on so we can explain this import process.
