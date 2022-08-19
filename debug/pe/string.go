@@ -42,7 +42,7 @@ func readStringTable(fh *FileHeader, r io.ReadSeeker) (StringTable, error) {
 		return nil, fmt.Errorf("fail to read string table length: %v", err)
 	}
 	// string table length includes itself
-	if l <= 4 {
+	if l <= 4 || l >= 0x40000000 {
 		return nil, nil
 	}
 	l -= 4
