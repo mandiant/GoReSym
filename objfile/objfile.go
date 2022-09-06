@@ -1528,7 +1528,7 @@ func (e *Entry) ParseITabLinks(runtimeVersion string, moduleData *ModuleData, is
 		if err == nil && err2 == nil && len(parsed) > 0 && len(parsed2) > 0 {
 			interfaceName := parsed[0].Str
 			implementerName := parsed2[0].Str
-			types = append(types, Type{VA: itabAddr, Str: fmt.Sprintf("interface_%s_impl_%s", interfaceName, implementerName), Kind: Interface.String()})
+			types = append(types, Type{VA: itabAddr, Str: fmt.Sprintf("go.itab.%s,%s", implementerName, interfaceName), Kind: Interface.String()})
 		}
 	}
 	return types, nil

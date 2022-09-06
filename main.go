@@ -2,6 +2,7 @@
 package main
 
 import (
+	"C"
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -393,4 +394,42 @@ func main() {
 			fmt.Println(DataToJson((metadata)))
 		}
 	}
+}
+
+//export SymbolToAddress
+func SymbolToAddress(fileName, symbol string) (addr uintptr, size int) {
+	metadata, err := main_impl(fileName, true, false, true, 0, "")
+	if err != nil {
+		return 0, 0
+	}
+
+	for _, f := range metadata.StdFunctions {
+		if f.FullName != symbol {
+			continue
+		}
+		return uintptr(f.Start), int(f.End) - int(f.Start)
+	}
+
+	for _, f := range metadata.UserFunctions {
+		if f.FullName != symbol {
+			continue
+		}
+		return uintptr(f.Start), int(f.End) - int(f.Start)
+	}
+
+	for _, t := range metadata.Types {
+		if t.Str != symbol {
+			continue
+		}
+		return uintptr(t.VA), 0
+	}
+
+	for _, t := range metadata.Interfaces {
+		if t.Str != symbol {
+			continue
+		}
+		return uintptr(t.VA), 0
+	}
+
+	return 0, 0
 }
