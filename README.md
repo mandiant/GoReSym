@@ -78,7 +78,7 @@ To import this information into IDA Pro you can run the script found in [https:/
 
 As the Go compiler and runtime have changed, so have the embedded metadata structures. GoReSym supports the following combinations of Go releases & metadata:
 
-* all combinations of Intel x86/x64  𝒙  MACH-O/ELF/PE  𝒙  big/little endian
+* all combinations of ARM64  𝒙  Intel x86/x64  𝒙  MACH-O/ELF/PE  𝒙  big/little endian
 * `pclntab` parsing: >= Go 1.2
 * `moduledata` location: >= Go 1.2
 * `moduledata` type parsing: >= Go 1.5
