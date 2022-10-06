@@ -107,7 +107,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	// Read string table.
 	f.StringTable, err = readStringTable(&f.FileHeader, sr)
 	if err != nil {
-		return nil, err
+		f.StringTable = nil // this isn't fatal
 	}
 
 	// Read symbol table.
