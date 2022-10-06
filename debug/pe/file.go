@@ -78,7 +78,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		var sign [4]byte
 		r.ReadAt(sign[:], signoff)
 		if !(sign[0] == 'P' && sign[1] == 'E' && sign[2] == 0 && sign[3] == 0) {
-			return nil, fmt.Errorf("Invalid PE COFF file signature of %v.", sign)
+			return nil, fmt.Errorf("invalid PE file signature: % x", sign)
 		}
 		base = signoff + 4
 	} else {
@@ -89,9 +89,17 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		return nil, err
 	}
 	switch f.FileHeader.Machine {
-	case IMAGE_FILE_MACHINE_UNKNOWN, IMAGE_FILE_MACHINE_ARMNT, IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_I386:
+	case IMAGE_FILE_MACHINE_AMD64,
+		IMAGE_FILE_MACHINE_ARM64,
+		IMAGE_FILE_MACHINE_ARMNT,
+		IMAGE_FILE_MACHINE_I386,
+		IMAGE_FILE_MACHINE_RISCV32,
+		IMAGE_FILE_MACHINE_RISCV64,
+		IMAGE_FILE_MACHINE_RISCV128,
+		IMAGE_FILE_MACHINE_UNKNOWN:
+		// ok
 	default:
-		return nil, fmt.Errorf("Unrecognised COFF file header machine value of 0x%x.", f.FileHeader.Machine)
+		return nil, fmt.Errorf("unrecognized PE machine: %#x", f.FileHeader.Machine)
 	}
 
 	var err error
@@ -99,7 +107,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	// Read string table.
 	f.StringTable, err = readStringTable(&f.FileHeader, sr)
 	if err != nil {
-		f.StringTable = nil // this isn't fatal
+		return nil, err
 	}
 
 	// Read symbol table.
@@ -115,7 +123,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	// Seek past file header.
 	_, err = sr.Seek(base+int64(binary.Size(f.FileHeader)), seekStart)
 	if err != nil {
-		return nil, fmt.Errorf("failure to seek past the file header: %v", err)
+		return nil, err
 	}
 
 	// Read optional header.
@@ -332,7 +340,7 @@ func (f *File) ImportedSymbols() ([]string, error) {
 		return nil, nil
 	}
 
-	pe64 := f.Machine == IMAGE_FILE_MACHINE_AMD64
+	_, pe64 := f.OptionalHeader.(*OptionalHeader64)
 
 	// grab the number of data directory entries
 	var dd_length uint32
@@ -360,7 +368,10 @@ func (f *File) ImportedSymbols() ([]string, error) {
 	var ds *Section
 	ds = nil
 	for _, s := range f.Sections {
-		if s.VirtualAddress <= idd.VirtualAddress && idd.VirtualAddress < s.VirtualAddress+s.VirtualSize {
+		// We are using distance between s.VirtualAddress and idd.VirtualAddress
+		// to avoid potential overflow of uint32 caused by addition of s.VirtualSize
+		// to s.VirtualAddress.
+		if s.VirtualAddress <= idd.VirtualAddress && idd.VirtualAddress-s.VirtualAddress < s.VirtualSize {
 			ds = s
 			break
 		}
