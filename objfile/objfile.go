@@ -23,9 +23,11 @@ import (
 )
 
 type PclntabCandidate struct {
-	pclntabVA uint64
-	pclntab   []byte
-	symtab    []byte // optional
+	SecStart      uint64
+	PclntabVA     uint64
+	Pclntab       []byte
+	Symtab        []byte // optional
+	ParsedPclntab *gosym.Table
 }
 
 type rawFile interface {
@@ -111,7 +113,7 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable(versionOverride string) (*gosym.Table, uint64, error) {
+func (f *File) PCLineTable(versionOverride string) ([]PclntabCandidate, error) {
 	return f.entries[0].PCLineTable(versionOverride)
 }
 
@@ -188,11 +190,11 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable(versionOverride string) (*gosym.Table, uint64, error) {
+func (e *Entry) PCLineTable(versionOverride string) ([]PclntabCandidate, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
-	// PATCH: DISABLED, We want to gopclntab table 95% of the time
+	// FEYE PATCH: DISABLED, We want to gopclntab table 95% of the time
 	// if pcln, ok := e.raw.(Liner); ok {
 	// 	return pcln, nil
 	// }
@@ -202,39 +204,28 @@ func (e *Entry) PCLineTable(versionOverride string) (*gosym.Table, uint64, error
 	// https://github.com/golang/go/issues/42954
 	candidates, err := e.raw.pcln()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	// try to resolve via symbol
-	textStart := uint64(0)
-	syms, err := e.raw.symbols()
-	if err == nil {
-		for _, s := range syms {
-			if s.Name == "runtime.text" {
-				textStart = s.Addr
-				break
-			}
-		}
-	}
-
-	// that may have failed, use section base directly
-	if textStart == 0 {
-		secBase, _, err := e.Text()
-		if err == nil {
-			textStart = secBase
-		}
-	}
-
+	var finalCandidates []PclntabCandidate
+	var atLeastOneGood bool = false
 	for _, candidate := range candidates {
-		table, err := gosym.NewTable(candidate.symtab, gosym.NewLineTable(candidate.pclntab, textStart), versionOverride)
-		if err != nil || table.Go12line == nil {
+		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart), versionOverride)
+		if err != nil || parsedTable.Go12line == nil {
 			continue
 		}
 
-		return table, candidate.pclntabVA, nil
+		// the first good one happens to be correct more often than the last
+		candidate.ParsedPclntab = parsedTable
+		finalCandidates = append(finalCandidates, candidate)
+		atLeastOneGood = true
 	}
 
-	return nil, 0, fmt.Errorf("failed to locate pclntab")
+	if atLeastOneGood {
+		return finalCandidates, nil
+	}
+
+	return finalCandidates, fmt.Errorf("failed to locate pclntab")
 }
 
 func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {

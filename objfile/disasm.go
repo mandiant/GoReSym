@@ -49,7 +49,7 @@ func (e *Entry) Disasm() (*Disasm, error) {
 		return nil, err
 	}
 
-	pcln, _, err := e.PCLineTable("")
+	pclns, err := e.PCLineTable("")
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (e *Entry) Disasm() (*Disasm, error) {
 	syms = keep
 	d := &Disasm{
 		syms:      syms,
-		pcln:      pcln,
+		pcln:      pclns[0].ParsedPclntab,
 		text:      textBytes,
 		textStart: textStart,
 		textEnd:   textStart + uint64(len(textBytes)),

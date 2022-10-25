@@ -116,8 +116,10 @@ ExitScan:
 					pclntab = data[pclntab_idx:]
 
 					var candidate PclntabCandidate
-					candidate.pclntab = pclntab
-					candidate.pclntabVA = uint64(sec.Addr) + uint64(pclntab_idx)
+					candidate.Pclntab = pclntab
+
+					candidate.SecStart = uint64(sec.Addr)
+					candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 					candidates = append(candidates, candidate)
 					// we must scan all signature for all sections. DO NOT BREAK
@@ -128,8 +130,9 @@ ExitScan:
 			pclntab_idx := bytes.Index(data, pclntab)
 			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
 				var candidate PclntabCandidate
-				candidate.pclntab = pclntab
-				candidate.pclntabVA = uint64(sec.Addr) + uint64(pclntab_idx)
+				candidate.Pclntab = pclntab
+				candidate.SecStart = uint64(sec.Addr)
+				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 				candidates = append(candidates, candidate)
 				break ExitScan
@@ -154,7 +157,7 @@ func (f *elfFile) pcln() (candidates []PclntabCandidate, err error) {
 
 	if err == nil {
 		for _, c := range candidates {
-			c.symtab = symtab
+			c.Symtab = symtab
 		}
 	}
 

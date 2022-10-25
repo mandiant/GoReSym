@@ -165,12 +165,14 @@ ExitScan:
 				[]byte("\xFF\xFF\xFF\xFB\x00\x00"), []byte("\xFF\xFF\xFF\xFA\x00\x00"), []byte("\xFF\xFF\xFF\xF0\x00\x00")}
 			matches := findAllOccurrences(data, pclntab_sigs)
 			for _, pclntab_idx := range matches {
-				if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
+				if pclntab_idx != -1 {
 					pclntab = data[pclntab_idx:]
 
 					var candidate PclntabCandidate
-					candidate.pclntab = pclntab
-					candidate.pclntabVA = imageBase + uint64(sec.VirtualAddress) + uint64(pclntab_idx)
+					candidate.Pclntab = pclntab
+
+					candidate.SecStart = imageBase + uint64(sec.VirtualAddress)
+					candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 					candidates = append(candidates, candidate)
 					// we must scan all signature for all sections. DO NOT BREAK
@@ -179,10 +181,12 @@ ExitScan:
 		} else {
 			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
 			pclntab_idx := bytes.Index(data, pclntab)
-			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
+			if pclntab_idx != -1 {
 				var candidate PclntabCandidate
-				candidate.pclntab = pclntab
-				candidate.pclntabVA = imageBase + uint64(sec.VirtualAddress) + uint64(pclntab_idx)
+				candidate.Pclntab = pclntab
+
+				candidate.SecStart = imageBase + uint64(sec.VirtualAddress)
+				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 				candidates = append(candidates, candidate)
 				break ExitScan
@@ -207,7 +211,7 @@ func (f *peFile) pcln() (candidates []PclntabCandidate, err error) {
 
 	if err == nil {
 		for _, c := range candidates {
-			c.symtab = symtab
+			c.Symtab = symtab
 		}
 	}
 

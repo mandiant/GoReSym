@@ -168,49 +168,59 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		}
 	}
 
-	tab, tabva, err := file.PCLineTable(versionOverride)
+	tabs, err := file.PCLineTable(versionOverride)
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
 	}
 
-	if tab.Go12line == nil {
-		log.Fatalf("pclntab read, but is nil")
-		return ExtractMetadata{}, fmt.Errorf("read pclntab, but parsing failed. The file may not be fully unpacked or corrupted: %w", err)
+	if len(tabs) == 0 {
+		return ExtractMetadata{}, fmt.Errorf("No pclntab candidates found")
 	}
 
-	if len(versionOverride) > 0 {
-		extractMetadata.Version = versionOverride
+	var moduleData *objfile.ModuleData = nil
+	var finalTab *objfile.PclntabCandidate = &tabs[0]
+	for _, tab := range tabs {
+		if len(versionOverride) > 0 {
+			extractMetadata.Version = versionOverride
+		}
+
+		// numeric only, go1.17 -> 1.17
+		goVersionIdx := strings.Index(extractMetadata.Version, "go")
+		if goVersionIdx != -1 {
+			// "devel go1.18-2d1d548 Tue Dec 21 03:55:43 2021 +0000"
+			extractMetadata.Version = strings.Split(extractMetadata.Version[goVersionIdx+2:]+" ", " ")[0]
+
+			// go1.18-2d1d548
+			extractMetadata.Version = strings.Split(extractMetadata.Version+"-", "-")[0]
+		}
+
+		extractMetadata.TabMeta.CpuQuantum = tab.ParsedPclntab.Go12line.Quantum
+
+		// quantum is the minimal unit for a program counter (1 on x86, 4 on most other systems).
+		// 386: 1, amd64: 1, arm: 4, arm64: 4, mips: 4, mips/64/64le/64be: 4, ppc64/64le: 4, riscv64: 4, s390x: 2, wasm: 1
+		extractMetadata.TabMeta.CpuQuantumStr = "x86/x64/wasm"
+		if extractMetadata.TabMeta.CpuQuantum == 2 {
+			extractMetadata.TabMeta.CpuQuantumStr = "s390x"
+		} else if extractMetadata.TabMeta.CpuQuantum == 4 {
+			extractMetadata.TabMeta.CpuQuantumStr = "arm/mips/ppc/riscv"
+		}
+
+		extractMetadata.TabMeta.VA = tab.PclntabVA
+		extractMetadata.TabMeta.Version = tab.ParsedPclntab.Go12line.Version.String()
+		extractMetadata.TabMeta.Endianess = tab.ParsedPclntab.Go12line.Binary.String()
+		extractMetadata.TabMeta.PointerSize = tab.ParsedPclntab.Go12line.Ptrsize
+
+		// this can be a little tricky to locate and parse properly across all go versions
+		// since moduledata holds a pointer to the pclntab, we can (hopefully) find the right candidate by using it to find the moduledata.
+		// if that location works, then we must have given it the correct pclntab VA. At least in theory...
+		_, tmpModData, err := file.ModuleDataTable(tab.PclntabVA, extractMetadata.Version, extractMetadata.TabMeta.Version, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
+		if err == nil && tmpModData != nil {
+			finalTab = &tab
+			moduleData = tmpModData
+		}
 	}
 
-	// numeric only, go1.17 -> 1.17
-	goVersionIdx := strings.Index(extractMetadata.Version, "go")
-	if goVersionIdx != -1 {
-		// "devel go1.18-2d1d548 Tue Dec 21 03:55:43 2021 +0000"
-		extractMetadata.Version = strings.Split(extractMetadata.Version[goVersionIdx+2:]+" ", " ")[0]
-
-		// go1.18-2d1d548
-		extractMetadata.Version = strings.Split(extractMetadata.Version+"-", "-")[0]
-	}
-
-	extractMetadata.TabMeta.CpuQuantum = tab.Go12line.Quantum
-
-	// quantum is the minimal unit for a program counter (1 on x86, 4 on most other systems).
-	// 386: 1, amd64: 1, arm: 4, arm64: 4, mips: 4, mips/64/64le/64be: 4, ppc64/64le: 4, riscv64: 4, s390x: 2, wasm: 1
-	extractMetadata.TabMeta.CpuQuantumStr = "x86/x64/wasm"
-	if extractMetadata.TabMeta.CpuQuantum == 2 {
-		extractMetadata.TabMeta.CpuQuantumStr = "s390x"
-	} else if extractMetadata.TabMeta.CpuQuantum == 4 {
-		extractMetadata.TabMeta.CpuQuantumStr = "arm/mips/ppc/riscv"
-	}
-
-	extractMetadata.TabMeta.VA = tabva
-	extractMetadata.TabMeta.Version = tab.Go12line.Version.String()
-	extractMetadata.TabMeta.Endianess = tab.Go12line.Binary.String()
-	extractMetadata.TabMeta.PointerSize = tab.Go12line.Ptrsize
-
-	// this can be a little tricky to locate and parse properly across all go versions
-	_, moduleData, err := file.ModuleDataTable(tabva, extractMetadata.Version, extractMetadata.TabMeta.Version, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
-	if err == nil {
+	if moduleData != nil {
 		extractMetadata.ModuleMeta = *moduleData
 		if printTypes && manualTypeAddress == 0 {
 			types, err := file.ParseTypeLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
@@ -231,12 +241,12 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 	}
 
 	if printFilePaths {
-		for k := range tab.Files {
+		for k := range finalTab.ParsedPclntab.Files {
 			extractMetadata.Files = append(extractMetadata.Files, k)
 		}
 	}
 
-	for _, elem := range tab.Funcs {
+	for _, elem := range finalTab.ParsedPclntab.Funcs {
 		if isStdPackage(elem.PackageName()) {
 			if printStdPkgs {
 				extractMetadata.StdFunctions = append(extractMetadata.StdFunctions, FuncMetadata{
