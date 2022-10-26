@@ -122,7 +122,7 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 ExitScan:
 	for _, sec := range f.macho.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.macho.DataAfterSection(sec.Name)
+		data := f.macho.DataAfterSection(sec)
 
 		if !foundpcln {
 			// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
@@ -205,7 +205,7 @@ func (f *machoFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian
 scan:
 	for _, sec := range f.macho.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.macho.DataAfterSection(sec.Name)
+		data := f.macho.DataAfterSection(sec)
 		if !foundsym {
 			// fall back to scanning for structure using address of pclntab, which is first value in struc
 			var pclntabVA_bytes []byte

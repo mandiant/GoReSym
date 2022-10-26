@@ -589,21 +589,23 @@ func getString(section []byte, start int) (string, bool) {
 	return "", false
 }
 
-func (f *File) DataAfterSection(name string) []byte {
+func (f *File) DataAfterSection(target *Section) []byte {
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
-		if s.Name == name {
+		if s.Addr == target.Addr && s.Name == target.Name {
 			found = true
 		}
 
-		raw, err := s.Data()
-		if found && raw != nil {
-			data = append(data, raw[:]...)
-		}
+		if found {
+			raw, err := s.Data()
+			if raw != nil {
+				data = append(data, raw[:]...)
+			}
 
-		if err != nil {
-			break
+			if err != nil {
+				break
+			}
 		}
 	}
 	return data

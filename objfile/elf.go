@@ -105,7 +105,7 @@ ExitScan:
 		}
 
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.elf.DataAfterSection(sec.Name)
+		data := f.elf.DataAfterSection(sec)
 		if !foundpcln {
 			// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
 			pclntab_sigs := [][]byte{[]byte("\xFB\xFF\xFF\xFF\x00\x00"), []byte("\xFA\xFF\xFF\xFF\x00\x00"), []byte("\xF0\xFF\xFF\xFF\x00\x00"),
@@ -190,7 +190,7 @@ scan:
 		}
 
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.elf.DataAfterSection(sec.Name)
+		data := f.elf.DataAfterSection(sec)
 		if !foundsym {
 			// fall back to scanning for structure using address of pclntab, which is first value in struc
 			var pclntabVA_bytes []byte
