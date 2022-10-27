@@ -217,6 +217,7 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		if err == nil && tmpModData != nil {
 			finalTab = &tab
 			moduleData = tmpModData
+			break
 		}
 	}
 
