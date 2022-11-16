@@ -385,7 +385,6 @@ func main() {
 	typeAddress := flag.Int("m", 0, "Manually parse the RTYPE at the provided virtual address, disables automated enumeration of moduledata typelinks itablinks")
 	versionOverride := flag.String("v", "", "Override the automated version detection, ex: 1.17. If this is wrong, parsing may fail or produce nonsense")
 	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is omitted for clarity")
-
 	flag.Parse()
 
 	if flag.NArg() != 1 {
