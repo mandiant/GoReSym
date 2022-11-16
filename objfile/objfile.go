@@ -754,6 +754,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.17":
 		fallthrough
 	case "1.18":
+		fallthrough
+	case "1.19":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -943,6 +945,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 	case "1.17":
 		fallthrough
 	case "1.18":
+		fallthrough
+	case "1.19":
 		if is64bit {
 			var rtype Rtype114_115_116_117_118_64
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1321,6 +1325,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.17":
 			fallthrough
 		case "1.18":
+			fallthrough
+		case "1.19":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer

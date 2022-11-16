@@ -1,0 +1,75 @@
+syntax = "proto3";
+package GoReSym;
+option go_package = "protobuf/GoReSym/";
+
+message PcLnTabMetadata {
+    uint64 va = 1;
+    string version = 2;
+    string endianess = 3;
+    uint32 cpuQuantum = 4;
+    string cpuQuantumStr = 5;
+    uint32 pointerSize = 6;
+}
+
+message FuncMetadata {
+    uint64 start = 1;
+    uint64 end = 2;
+    string packageName = 3;
+    string fullName = 4;
+}
+
+message GoSlice {
+    uint64 data = 1;
+    uint64 len = 2;
+    uint64 capacity = 3;
+}
+
+message ModuleData {
+    uint64 va = 1;
+    uint64 types = 2;
+    uint64 etypes = 3;
+    GoSlice typeLinks = 4;
+    GoSlice itabLinks = 5;
+    GoSlice legacyTypes = 6;
+}
+
+message Type {
+    uint64 va = 1;
+    string str = 2;
+    string kind = 3;
+    string reconstructed = 4;
+}
+
+message Module {
+    string path = 1;
+    string version = 2;
+    string sum = 3;
+}
+
+message BuildSetting {
+    string key = 1;
+    string value = 2;
+}
+
+message BuildInfo {
+    string goVersion = 1;
+    string path = 2;
+    Module main = 3;
+    repeated Module deps = 4;
+    repeated BuildSetting settings = 5;
+}
+
+message ExtractMetadata {
+    string version = 1;
+    string buildId = 2;
+    string arch = 3;
+    string os = 4;
+    PcLnTabMetadata tabMeta = 5;
+    ModuleData moduleMeta = 6;
+    repeated Type types = 7;
+    repeated Type interfaces = 8;
+    BuildInfo buildInfo = 9;
+    repeated string files = 10;
+    repeated FuncMetadata userFunctions = 11;
+    repeated FuncMetadata stdFunctions = 12;
+}
