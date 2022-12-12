@@ -49,7 +49,7 @@ func (e *Entry) Disasm() (*Disasm, error) {
 		return nil, err
 	}
 
-	pclns, err := e.PCLineTable("")
+	pclns, err := e.PCLineTable("", 0)
 	if err != nil {
 		return nil, err
 	}

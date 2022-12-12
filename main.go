@@ -168,13 +168,15 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		}
 	}
 
-	tabs, err := file.PCLineTable(versionOverride)
+	var knownGoTextBase = uint64(0)
+restartParseWithRealTextBase:
+	tabs, err := file.PCLineTable(versionOverride, knownGoTextBase)
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
 	}
 
 	if len(tabs) == 0 {
-		return ExtractMetadata{}, fmt.Errorf("No pclntab candidates found")
+		return ExtractMetadata{}, fmt.Errorf("no pclntab candidates found")
 	}
 
 	var moduleData *objfile.ModuleData = nil
@@ -213,8 +215,17 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		// this can be a little tricky to locate and parse properly across all go versions
 		// since moduledata holds a pointer to the pclntab, we can (hopefully) find the right candidate by using it to find the moduledata.
 		// if that location works, then we must have given it the correct pclntab VA. At least in theory...
+		// The resolved offsets within the pclntab might have used the wrong base though! We'll fix that later.
 		_, tmpModData, err := file.ModuleDataTable(tab.PclntabVA, extractMetadata.Version, extractMetadata.TabMeta.Version, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
 		if err == nil && tmpModData != nil {
+			if knownGoTextBase == 0 {
+				// assign real base and restart pclntab parsing with correct VAs!
+				// TODO: optimize, we should only restart pclntab parsing of the candidates we know find a moduledata
+				knownGoTextBase = tmpModData.TextVA
+				goto restartParseWithRealTextBase
+			}
+
+			// we already have pclntab candidates with the right VA, but which candidate?? The one that finds a valid moduledata!
 			finalTab = &tab
 			moduleData = tmpModData
 			break

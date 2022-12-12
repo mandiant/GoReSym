@@ -113,8 +113,8 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable(versionOverride string) ([]PclntabCandidate, error) {
-	return f.entries[0].PCLineTable(versionOverride)
+func (f *File) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]PclntabCandidate, error) {
+	return f.entries[0].PCLineTable(versionOverride, knownGoTextBase)
 }
 
 func (f *File) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
@@ -190,7 +190,7 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable(versionOverride string) ([]PclntabCandidate, error) {
+func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]PclntabCandidate, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
@@ -210,6 +210,17 @@ func (e *Entry) PCLineTable(versionOverride string) ([]PclntabCandidate, error) 
 	var finalCandidates []PclntabCandidate
 	var atLeastOneGood bool = false
 	for _, candidate := range candidates {
+		/* See https://github.com/mandiant/GoReSym/pull/11
+		Locating the .text base is not safe by name due to packers which mangle names. We also have to consider CGO
+		which appears to update the base with an 'adjusted' one to add some shim code. So, PCLineTable
+		get called first with the candidate.SecStart just to find symbols, just so we can find the moduledata.
+		Then, we invoke it again with a 'known' text base, which is found by reading data held in the moduledata.
+		That is, we do all this parsing twice, on purpose, to be resiliant, we have better info on round 2.
+		*/
+		if knownGoTextBase != 0 {
+			candidate.SecStart = knownGoTextBase
+		}
+
 		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart), versionOverride)
 		if err != nil || parsedTable.Go12line == nil {
 			continue
@@ -292,6 +303,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				}
 
 				moduleData.VA = moduledataVA
+				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
@@ -340,6 +352,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				}
 
 				moduleData.VA = moduledataVA
+				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)
@@ -378,6 +391,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				}
 
 				moduleData.VA = moduledataVA
+				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
@@ -409,6 +423,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				}
 
 				moduleData.VA = moduledataVA
+				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)
@@ -455,6 +470,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// Fake the same Types + Typelinks offsets that later moduledata's use.
 					// The base would be the normal typelinks pointer, and then we
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.LegacyTypes = module.Typelinks
 					return secStart, moduleData, err
 				} else {
@@ -483,6 +499,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					}
 
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.LegacyTypes.Data = pvoid64(module.Typelinks.Data)
 					moduleData.LegacyTypes.Len = uint64(module.Typelinks.Len)
 					moduleData.LegacyTypes.Capacity = uint64(module.Typelinks.Capacity)
@@ -517,6 +534,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// Fake the same Types + Typelinks offsets that later moduledata's use.
 					// The base would be the normal typelinks pointer, and then we
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
@@ -548,6 +566,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					}
 
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)
@@ -600,6 +619,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					}
 
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
@@ -631,6 +651,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					}
 
 					moduleData.VA = moduledataVA
+					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)

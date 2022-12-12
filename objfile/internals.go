@@ -1056,6 +1056,7 @@ type Type struct {
 // this lets us return a single type, even though moduledata changes between go version
 type ModuleData struct {
 	VA        uint64
+	TextVA    uint64    // adjusted (ex: CGO) .text base that pclntab offsets are relative to
 	Types     uint64    // points to type information
 	ETypes    uint64    // points to end of type information
 	Typelinks GoSlice64 // points to metadata about offsets into types for structures and other types
