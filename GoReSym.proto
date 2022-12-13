@@ -26,12 +26,12 @@ message GoSlice {
 
 message ModuleData {
     uint64 va = 1 [json_name="VA"];
-    uint64 textVa = 2 [json_name="TextVA"];
-    uint64 types = 3 [json_name="Types"];
-    uint64 etypes = 4 [json_name="ETypes"];
-    GoSlice typeLinks = 5 [json_name="Typelinks"];
-    GoSlice itabLinks = 6 [json_name="ITablinks"];
-    GoSlice legacyTypes = 7 [json_name="LegacyTypes"];
+    uint64 types = 2 [json_name="Types"];
+    uint64 etypes = 3 [json_name="ETypes"];
+    GoSlice typeLinks = 4 [json_name="Typelinks"];
+    GoSlice itabLinks = 5 [json_name="ITablinks"];
+    GoSlice legacyTypes = 6 [json_name="LegacyTypes"];
+    uint64 textVa = 7 [json_name="TextVA"];
 }
 
 message Type {
