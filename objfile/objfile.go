@@ -1203,9 +1203,13 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			fallthrough
 		case "1.15":
 			fallthrough
+		case "1.16":
+			fallthrough
 		case "1.17":
 			fallthrough
 		case "1.18":
+			fallthrough
+		case "1.19":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1342,6 +1346,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.14":
 			fallthrough
 		case "1.15":
+			fallthrough
+		case "1.16":
 			fallthrough
 		case "1.17":
 			fallthrough
