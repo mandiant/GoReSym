@@ -1,6 +1,7 @@
 # Copyright (C) 2022 Mandiant, Inc. All Rights Reserved.
 import idaapi
 import ida_bytes
+import ida_funcs
 import ida_kernwin
 import ida_name
 import json
@@ -23,6 +24,8 @@ with open(hints, "r", encoding="utf-8") as rp:
 hints = json.loads(buf)
 if iterable(hints['UserFunctions']):
     for func in hints['UserFunctions']:
+        ida_bytes.del_items(func['Start'])
+        ida_funcs.add_func(func['Start'])
         print("Renaming %s to %s" % (hex(func['Start']), func['FullName']))
         idaapi.add_func(func['Start'], func['End'])
         idaapi.set_name(func['Start'], func['FullName'], idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
@@ -30,6 +33,8 @@ if iterable(hints['UserFunctions']):
 if iterable(hints['StdFunctions']):
     for func in hints['StdFunctions']:
         print("Renaming %s to %s" % (hex(func['Start']), func['FullName']))
+        ida_bytes.del_items(func['Start'])
+        ida_funcs.add_func(func['Start'])
         idaapi.add_func(func['Start'], func['End'])
         idaapi.set_name(func['Start'], func['FullName'], idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
 
