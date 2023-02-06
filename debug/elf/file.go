@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/mandiant/GoReSym/debug/dwarf"
+	"github.com/mandiant/GoReSym/saferio"
 )
 
 // seekStart, seekCurrent, seekEnd are copies of
@@ -325,12 +326,32 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		shstrndx = int(hdr.Shstrndx)
 	}
 
+	if shoff < 0 {
+		return nil, &FormatError{0, "invalid shoff", shoff}
+	}
+	if phoff < 0 {
+		return nil, &FormatError{0, "invalid phoff", phoff}
+	}
+
 	if shoff == 0 && shnum != 0 {
 		return nil, &FormatError{0, "invalid ELF shnum for shoff=0", shnum}
 	}
 
 	if shnum > 0 && shstrndx >= shnum {
 		return nil, &FormatError{0, "invalid ELF shstrndx", shstrndx}
+	}
+
+	var wantPhentsize, wantShentsize int
+	switch f.Class {
+	case ELFCLASS32:
+		wantPhentsize = 8 * 4
+		wantShentsize = 10 * 4
+	case ELFCLASS64:
+		wantPhentsize = 2*4 + 6*8
+		wantShentsize = 4*4 + 6*8
+	}
+	if phnum > 0 && phentsize < wantPhentsize {
+		return nil, &FormatError{0, "invalid ELF phentsize", phentsize}
 	}
 
 	// Read program headers
@@ -371,14 +392,74 @@ func NewFile(r io.ReaderAt) (*File, error) {
 				Align:  ph.Align,
 			}
 		}
+		if int64(p.Off) < 0 {
+			return nil, &FormatError{off, "invalid program header offset", p.Off}
+		}
+		if int64(p.Filesz) < 0 {
+			return nil, &FormatError{off, "invalid program header file size", p.Filesz}
+		}
 		p.sr = io.NewSectionReader(r, int64(p.Off), int64(p.Filesz))
 		p.ReaderAt = p.sr
 		f.Progs[i] = p
 	}
 
+	// If the number of sections is greater than or equal to SHN_LORESERVE
+	// (0xff00), shnum has the value zero and the actual number of section
+	// header table entries is contained in the sh_size field of the section
+	// header at index 0.
+	if shoff > 0 && shnum == 0 {
+		var typ, link uint32
+		sr.Seek(shoff, seekStart)
+		switch f.Class {
+		case ELFCLASS32:
+			sh := new(Section32)
+			if err := binary.Read(sr, f.ByteOrder, sh); err != nil {
+				return nil, err
+			}
+			shnum = int(sh.Size)
+			typ = sh.Type
+			link = sh.Link
+		case ELFCLASS64:
+			sh := new(Section64)
+			if err := binary.Read(sr, f.ByteOrder, sh); err != nil {
+				return nil, err
+			}
+			shnum = int(sh.Size)
+			typ = sh.Type
+			link = sh.Link
+		}
+		if SectionType(typ) != SHT_NULL {
+			return nil, &FormatError{shoff, "invalid type of the initial section", SectionType(typ)}
+		}
+
+		if shnum < int(SHN_LORESERVE) {
+			return nil, &FormatError{shoff, "invalid ELF shnum contained in sh_size", shnum}
+		}
+
+		// If the section name string table section index is greater than or
+		// equal to SHN_LORESERVE (0xff00), this member has the value
+		// SHN_XINDEX (0xffff) and the actual index of the section name
+		// string table section is contained in the sh_link field of the
+		// section header at index 0.
+		if shstrndx == int(SHN_XINDEX) {
+			shstrndx = int(link)
+			if shstrndx < int(SHN_LORESERVE) {
+				return nil, &FormatError{shoff, "invalid ELF shstrndx contained in sh_link", shstrndx}
+			}
+		}
+	}
+
+	if shnum > 0 && shentsize < wantShentsize {
+		return nil, &FormatError{0, "invalid ELF shentsize", shentsize}
+	}
+
 	// Read section headers
-	f.Sections = make([]*Section, shnum)
-	names := make([]uint32, shnum)
+	c := saferio.SliceCap((*Section)(nil), uint64(shnum))
+	if c < 0 {
+		return nil, &FormatError{0, "too many sections", shnum}
+	}
+	f.Sections = make([]*Section, 0, c)
+	names := make([]uint32, 0, c)
 	for i := 0; i < shnum; i++ {
 		off := shoff + int64(i)*int64(shentsize)
 		sr.Seek(off, seekStart)
@@ -389,7 +470,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(sr, f.ByteOrder, sh); err != nil {
 				return nil, err
 			}
-			names[i] = sh.Name
+			names = append(names, sh.Name)
 			s.SectionHeader = SectionHeader{
 				Type:      SectionType(sh.Type),
 				Flags:     SectionFlag(sh.Flags),
@@ -406,7 +487,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(sr, f.ByteOrder, sh); err != nil {
 				return nil, err
 			}
-			names[i] = sh.Name
+			names = append(names, sh.Name)
 			s.SectionHeader = SectionHeader{
 				Type:      SectionType(sh.Type),
 				Flags:     SectionFlag(sh.Flags),
@@ -418,6 +499,12 @@ func NewFile(r io.ReaderAt) (*File, error) {
 				Addralign: sh.Addralign,
 				Entsize:   sh.Entsize,
 			}
+		}
+		if int64(s.Offset) < 0 {
+			return nil, &FormatError{off, "invalid section offset", int64(s.Offset)}
+		}
+		if int64(s.FileSize) < 0 {
+			return nil, &FormatError{off, "invalid section size", int64(s.FileSize)}
 		}
 		s.sr = io.NewSectionReader(r, int64(s.Offset), int64(s.FileSize))
 
@@ -448,7 +535,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 		}
 
-		f.Sections[i] = s
+		f.Sections = append(f.Sections, s)
 	}
 
 	if len(f.Sections) == 0 {
@@ -456,7 +543,16 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 
 	// Load section header string table.
-	shstrtab, err := f.Sections[shstrndx].Data()
+	if shstrndx == 0 {
+		// If the file has no section name string table,
+		// shstrndx holds the value SHN_UNDEF (0).
+		return f, nil
+	}
+	shstr := f.Sections[shstrndx]
+	if shstr.Type != SHT_STRTAB {
+		return nil, &FormatError{shoff + int64(shstrndx*shentsize), "invalid ELF section name string table type", shstr.Type}
+	}
+	shstrtab, err := shstr.Data()
 	if err != nil {
 		return nil, err
 	}
