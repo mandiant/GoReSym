@@ -94,32 +94,33 @@ Much of the source code from GoReSym is copied from the upstream Go compiler sou
 
 Due to the way Go packages work, we needed to remove the `/internal` path from the source file tree. This resulted in a lot of copying of internal Go files, where the directory tree is mostly intact but with small changes to many files' imports: references to `/internal` paths were replaced with `github.com/mandiant/GoReSym/`. 
 
-We also modified many internal structures to export fields and methods. These are not exported by Go upstream because users should not rely upon them. However, the purpose of this tool is to extract internal information, so we're taking on the task of maintaining these structures. Its not a great situation, but it's not easily avoidable. If you update this repository, you must take care to keep these modifications intact. Its probably better to manually merge in commits from upstream rather than copying upstream files wholesale.
+We also modified many internal structures to export fields and methods. These are not exported by Go upstream because users should not rely upon them. However, the purpose of this tool is to extract internal information, so we're taking on the task of maintaining these structures. It's not a great situation, but it's not easily avoidable. If you update this repository, you must take care to keep these modifications intact. It's probably better to manually merge in commits from upstream rather than copying upstream files wholesale.
 
 I am open to suggestions on how to better structure this project to avoid these issues while still compiling with the typical `go build`. There is a previous discussion involving Go maintainers [here](https://github.com/golang/go/issues/46792).
 
 Ignoring some trivial changes, most new logic exists in `/objfile`. For example, the file `objfile/internals` defines the reversed internal Go structures that GoReSym parses.
 
 # References
-* `pclntab` specification: [golang.org/s/go12symtab](https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub)
-* `pclntab` magics: [pclntab.go#L169](https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169)
-* `objfile` bug(s): 
+* `pclntab` Specification: [golang.org/s/go12symtab](https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub)
+* `pclntab` Magics: [pclntab.go#L169](https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169)
+* `objfile` Bug(s): 
   *  [golang/go#42954](https://github.com/golang/go/issues/42954)
   *  [golang/go#47981](https://github.com/golang/go/issues/47981)
   *  [golang/go#47852](https://github.com/golang/go/issues/47852)
-* `buildID` legacy bug: [golang/go#50809](https://github.com/golang/go/issues/50809)
+* `buildID` Legacy bug: [golang/go#50809](https://github.com/golang/go/issues/50809)
 
 # Changes
-* `pcln()` functions in `objfile/<fileformat>` have been extended to support byte scanning the `pclntab` magic
-* file format parsers in `/debug/<fileformat>` have added routines such as `DataAfterSection` to support the signature scan
-* `debug/gosym/symtab.go`'s `walksymtab` has an added check to bail early when the optional `symtab` section is empty
-* many members and internal structs have been exported. Go uses capitalization to declare public vs private. The changes here are too many to enumerate
-* `objfile/objfile.go`'s `PCLineTable()` has had `goobj` liner support removed. This object time is not common to see, and the liner table cannot be signatured for, so `goobj` file support is removed.
-* extra sanity checks around `loadPeTable` (and other format variants) to avoid panic when symbols are present but malicious modified to be invalid (ref: [golang/go#47981](https://github.com/golang/go/issues/47981))
-* the signatures of some internal functions have been modified to provide lower level access to information such as section addresses and offsets. 
-* `read_memory` routines for supported file formats implemented to read file data by virtual address
-* `moduledata` scan routines introduced to help locate moduledata in support of scanning for types and interfaces (via `typelinks`)
-* `readStringTable` has size guards added for invalid symbol tables. Parsing failures are ignored as well.
+*   Extended `pcln()` functions in `objfile/<fileformat>` to support byte scanning the `pclntab` magic
+*   Added routines such as `DataAfterSection` to support signature scan in file format parsers in `/debug/<fileformat>`
+*  Added check to `debug/gosym/symtab.go`'s `walksymtab` to bail early when the optional `symtab` section is empty
+*   Exported many members and internal structs (changes are too many to enumerate)
+*    Removed `goobj` liner support in `objfile/objfile.go`'s `PCLineTable()`
+*    Added extra sanity checks around `loadPeTable` (and other format variants) to avoid panic when symbols are present but maliciously modified to be invalid (ref: [golang/go#47981](https://github.com/golang/go/issues/47981))
+*   Modified the signatures of some internal functions to provide lower level access to information such as section addresses and offsets
+*   Implemented `read_memory` routines for supported file formats to read file data by virtual address
+*   Introduced `moduledata` scan routines to help locate moduledata in support of scanning for types and interfaces (via typelinks)
+*  Added size guards to `readStringTable` for invalid symbol tables. Parsing failures are ignored as well.
+
     
 # License
 MIT
