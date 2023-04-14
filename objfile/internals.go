@@ -647,6 +647,124 @@ func (moduledata *ModuleData118_32) parse(rawData []byte, littleEndian bool) err
 	return binary.Read(srcBytes, byteOrder, moduledata)
 }
 
+type ModuleData120_64 struct {
+	PcHeader     pvoid64
+	Funcnametab  GoSlice64
+	Cutab        GoSlice64
+	Filetab      GoSlice64
+	Pctab        GoSlice64
+	Pclntable    GoSlice64
+	Ftab         GoSlice64
+	Findfunctab  pvoid64
+	Minpc        pvoid64
+	Maxpc        pvoid64
+	Text         pvoid64
+	Etext        pvoid64
+	Noptrdata    pvoid64
+	Enoptrdata   pvoid64
+	Data         pvoid64
+	Edata        pvoid64
+	Bss          pvoid64
+	Ebss         pvoid64
+	Noptrbss     pvoid64
+	Enoptrbss    pvoid64
+	Covctrs      pvoid64
+	Ecovctrs     pvoid64
+	End          pvoid64
+	Gcdata       pvoid64
+	Gcbss        pvoid64
+	Types        pvoid64
+	Etypes       pvoid64
+	Rodata       pvoid64
+	Gofunc       pvoid64
+	Textsectmap  GoSlice64
+	Typelinks    GoSlice64
+	Itablinks    GoSlice64
+	Ptab         GoSlice64
+	Pluginpath   GoString64
+	Pkghashes    GoSlice64
+	Modulename   GoString64
+	Modulehashes GoSlice64
+	Hasmain      bool
+	Gcdatamask   GoBitVector64
+	Gcbssmask    GoBitVector64
+	Typemap      pvoid64
+	Badload      bool
+	Next         pvoid64
+}
+
+func (moduledata *ModuleData120_64) parse(rawData []byte, littleEndian bool) error {
+	srcBytes := bytes.NewBuffer(rawData)
+
+	var byteOrder binary.ByteOrder
+	if littleEndian {
+		byteOrder = binary.LittleEndian
+	} else {
+		byteOrder = binary.BigEndian
+	}
+
+	return binary.Read(srcBytes, byteOrder, moduledata)
+}
+
+type ModuleData120_32 struct {
+	PcHeader     pvoid32
+	Funcnametab  GoSlice32
+	Cutab        GoSlice32
+	Filetab      GoSlice32
+	Pctab        GoSlice32
+	Pclntable    GoSlice32
+	Ftab         GoSlice32
+	Findfunctab  pvoid32
+	Minpc        pvoid32
+	Maxpc        pvoid32
+	Text         pvoid32
+	Etext        pvoid32
+	Noptrdata    pvoid32
+	Enoptrdata   pvoid32
+	Data         pvoid32
+	Edata        pvoid32
+	Bss          pvoid32
+	Ebss         pvoid32
+	Noptrbss     pvoid32
+	Enoptrbss    pvoid32
+	Covctrs      pvoid32
+	Ecovctrs     pvoid32
+	End          pvoid32
+	Gcdata       pvoid32
+	Gcbss        pvoid32
+	Types        pvoid32
+	Etypes       pvoid32
+	Rodata       pvoid32
+	Gofunc       pvoid32
+	Textsectmap  GoSlice32
+	Typelinks    GoSlice32
+	Itablinks    GoSlice32
+	Ptab         GoSlice32
+	Pluginpath   GoString32
+	Pkghashes    GoSlice32
+	Modulename   GoString32
+	Modulehashes GoSlice32
+	Hasmain      bool
+	Gcdatamask   GoBitVector32
+	Gcbssmask    GoBitVector32
+	Typemap      pvoid32
+	Badload      bool
+	Next         pvoid32
+}
+
+func (moduledata *ModuleData120_32) parse(rawData []byte, littleEndian bool) error {
+	srcBytes := bytes.NewBuffer(rawData)
+
+	var byteOrder binary.ByteOrder
+	if littleEndian {
+		byteOrder = binary.LittleEndian
+	} else {
+		byteOrder = binary.BigEndian
+	}
+
+	return binary.Read(srcBytes, byteOrder, moduledata)
+}
+
 type Textsect_64 struct {
 	Vaddr    pvoid64 // prelinked section vaddr
 	End      pvoid64 // vaddr + section length
