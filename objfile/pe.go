@@ -178,6 +178,29 @@ ExitScan:
 					// we must scan all signature for all sections. DO NOT BREAK
 				}
 			}
+            // 2.1) Also try to guess the location of the pclntab by looking for the first runtime package (internal/cpu.Initialize)
+            //      This is a bit of a hack for some obfuscated/mangled binaries, but it works in most cases for repairing the pclntab enough to restore symbols
+            //      for analysis purposes
+            internal_sig := [][]byte{[]byte("internal/cpu.Initialize")}
+            matches = findAllOccurrences(data, internal_sig)
+            for _, internal_idx := range matches {
+                if internal_idx != -1 {
+                    // attempt to guess the location of the start of the pclntab by looking 96 bytes before the first runtime package
+                    // the location is also floored to the nearest 16 byte boundary, since this appears to be the most common alignment
+                    pclntab_idx := ((internal_idx / 0x10 * 0x10) - 96)
+                    for _, sig := range pclntab_sigs {
+                        pclntab = append(sig, data[pclntab_idx+6:]...)
+                    
+                        var candidate PclntabCandidate
+                        candidate.Pclntab = pclntab
+
+                        candidate.SecStart = imageBase + uint64(sec.VirtualAddress)
+                        candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
+
+                        candidates = append(candidates, candidate)
+                    }
+                }
+            }
 		} else {
 			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
 			pclntab_idx := bytes.Index(data, pclntab)
