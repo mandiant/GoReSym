@@ -106,15 +106,38 @@ ExitScan:
 
 		// malware can split the pclntab across multiple sections, re-merge
 		data := f.elf.DataAfterSection(sec)
-		if !foundpcln {
-			// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
-			pclntab_sigs := [][]byte{[]byte("\xFB\xFF\xFF\xFF\x00\x00"), []byte("\xFA\xFF\xFF\xFF\x00\x00"), []byte("\xF0\xFF\xFF\xFF\x00\x00"), []byte("\xF1\xFF\xFF\xFF\x00\x00"),
-				[]byte("\xFF\xFF\xFF\xFB\x00\x00"), []byte("\xFF\xFF\xFF\xFA\x00\x00"), []byte("\xFF\xFF\xFF\xF0\x00\x00"), []byte("\xFF\xFF\xFF\xF1\x00\x00")}
-			matches := findAllOccurrences(data, pclntab_sigs)
-			for _, pclntab_idx := range matches {
-				if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
-					pclntab = data[pclntab_idx:]
 
+		// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
+		pclntab_sigs := [][]byte{[]byte("\xFB\xFF\xFF\xFF\x00\x00"), []byte("\xFA\xFF\xFF\xFF\x00\x00"), []byte("\xF0\xFF\xFF\xFF\x00\x00"), []byte("\xF1\xFF\xFF\xFF\x00\x00"),
+			[]byte("\xFF\xFF\xFF\xFB\x00\x00"), []byte("\xFF\xFF\xFF\xFA\x00\x00"), []byte("\xFF\xFF\xFF\xF0\x00\x00"), []byte("\xFF\xFF\xFF\xF1\x00\x00")}
+		matches := findAllOccurrences(data, pclntab_sigs)
+		for _, pclntab_idx := range matches {
+			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
+				pclntab = data[pclntab_idx:]
+
+				var candidate PclntabCandidate
+				candidate.Pclntab = pclntab
+
+				candidate.SecStart = uint64(sec.Addr)
+				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
+
+				candidates = append(candidates, candidate)
+				// we must scan all signature for all sections. DO NOT BREAK
+			}
+		}
+		// 2.1) Also try to guess the location of the pclntab by looking for the first runtime package (internal/cpu.Initialize)
+		//      This is a bit of a hack for some obfuscated/mangled binaries, but it works in most cases for repairing the pclntab enough to restore symbols
+		//      for analysis purposes
+		internal_sig := [][]byte{[]byte("internal/cpu.Initialize")}
+		matches = findAllOccurrences(data, internal_sig)
+		for _, internal_idx := range matches {
+			if internal_idx != -1 {
+				// attempt to guess the location of the start of the pclntab by looking 96 bytes before the first runtime package
+				// the location is also floored to the nearest 16 byte boundary, since this appears to be the most common alignment
+				pclntab_idx := ((internal_idx / 0x10 * 0x10) - 96)
+				for _, sig := range pclntab_sigs {
+					pclntab = append(sig, data[pclntab_idx+6:]...)
+				
 					var candidate PclntabCandidate
 					candidate.Pclntab = pclntab
 
@@ -122,33 +145,11 @@ ExitScan:
 					candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 					candidates = append(candidates, candidate)
-					// we must scan all signature for all sections. DO NOT BREAK
 				}
 			}
-            // 2.1) Also try to guess the location of the pclntab by looking for the first runtime package (internal/cpu.Initialize)
-            //      This is a bit of a hack for some obfuscated/mangled binaries, but it works in most cases for repairing the pclntab enough to restore symbols
-            //      for analysis purposes
-            internal_sig := [][]byte{[]byte("internal/cpu.Initialize")}
-            matches = findAllOccurrences(data, internal_sig)
-            for _, internal_idx := range matches {
-                if internal_idx != -1 {
-                    // attempt to guess the location of the start of the pclntab by looking 96 bytes before the first runtime package
-                    // the location is also floored to the nearest 16 byte boundary, since this appears to be the most common alignment
-                    pclntab_idx := ((internal_idx / 0x10 * 0x10) - 96)
-                    for _, sig := range pclntab_sigs {
-                        pclntab = append(sig, data[pclntab_idx+6:]...)
-                    
-					    var candidate PclntabCandidate
-					    candidate.Pclntab = pclntab
-
-					    candidate.SecStart = uint64(sec.Addr)
-					    candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
-
-					    candidates = append(candidates, candidate)
-                    }
-                }
-            }
-		} else {
+		}
+		
+		if foundpcln {
 			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
 			pclntab_idx := bytes.Index(data, pclntab)
 			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
