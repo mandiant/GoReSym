@@ -140,7 +140,9 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 
 	// 1) Locate pclntab via symbols (standard way)
 	foundpcln := false
+	symbol_method := false
 	var pclntab []byte
+	var pclntab_sym []byte
 
 	if pclntab, err = loadPETable(f.pe, "runtime.pclntab", "runtime.epclntab"); err == nil {
 		foundpcln = true
@@ -154,14 +156,29 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	}
 
 	// 2) if not found, byte scan for it
-ExitScan:
+	var virtualOffset uint64 = 0
+	var pclntabPtr uint32 = 0
+	pclntab_sigs := [][]byte{
+		[]byte("\xF1\xFF\xFF\xFF\x00\x00"),
+		[]byte("\xF0\xFF\xFF\xFF\x00\x00"),
+		[]byte("\xFA\xFF\xFF\xFF\x00\x00"),
+		[]byte("\xFB\xFF\xFF\xFF\x00\x00"),   
+		[]byte("\xFF\xFF\xFF\xFB\x00\x00"), 
+		[]byte("\xFF\xFF\xFF\xFA\x00\x00"), 
+		[]byte("\xFF\xFF\xFF\xF0\x00\x00"), 
+		[]byte("\xFF\xFF\xFF\xF1\x00\x00"),
+	}
 	for _, sec := range f.pe.Sections {
-		// malware can split the pclntab across multiple sections, re-merge
 		data := f.pe.DataAfterSection(sec)
+		sectionData, _ := sec.Data()
+		if uint32(len(data)) < sec.Size {
+			continue
+		}
 
+
+		// 2.1 original byte scan for magic
+		// malware can split the pclntab across multiple sections, re-merge
 		// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
-		pclntab_sigs := [][]byte{[]byte("\xFB\xFF\xFF\xFF\x00\x00"), []byte("\xFA\xFF\xFF\xFF\x00\x00"), []byte("\xF0\xFF\xFF\xFF\x00\x00"), []byte("\xF1\xFF\xFF\xFF\x00\x00"),
-			[]byte("\xFF\xFF\xFF\xFB\x00\x00"), []byte("\xFF\xFF\xFF\xFA\x00\x00"), []byte("\xFF\xFF\xFF\xF0\x00\x00"), []byte("\xFF\xFF\xFF\xF1\x00\x00")}
 		matches := findAllOccurrences(data, pclntab_sigs)
 		for _, pclntab_idx := range matches {
 			if pclntab_idx != -1 {
@@ -177,41 +194,58 @@ ExitScan:
 				// we must scan all signature for all sections. DO NOT BREAK
 			}
 		}
-		// 2.1) Also try to guess the location of the pclntab by looking for the first runtime package (internal/cpu.Initialize)
-		//      This is a bit of a hack for some obfuscated/mangled binaries, but it works in most cases for repairing the pclntab enough to restore symbols
-		//      for analysis purposes
-		internal_sig := [][]byte{[]byte("internal/cpu.Initialize")}
-		matches = findAllOccurrences(data, internal_sig)
-		for _, internal_idx := range matches {
-			if internal_idx != -1 {
-				// attempt to guess the location of the start of the pclntab by looking 96 bytes before the first runtime package
-				// the location is also floored to the nearest 16 byte boundary, since this appears to be the most common alignment
-				pclntab_idx := ((internal_idx / 0x10 * 0x10) - 96)
-				for _, sig := range pclntab_sigs {
-					pclntab = append(sig, data[pclntab_idx+6:]...)
-				
-					var candidate PclntabCandidate
-					candidate.Pclntab = pclntab
 
-					candidate.SecStart = imageBase + uint64(sec.VirtualAddress)
-					candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
-
-					candidates = append(candidates, candidate)
-				}
-			}
+		pcHeader := findModuleInitPCHeader(peScanner, sectionData)
+		if len(pcHeader) == 2 {
+			virtualOffset = (pcHeader[1] + uint64(sec.VirtualAddress)) + pcHeader[0]
 		}
-		if foundpcln {
+
+		if virtualOffset != 0 {
+			if virtualOffset >= uint64(sec.VirtualAddress) && virtualOffset <= uint64(sec.VirtualAddress + sec.Size) {
+				// The virtual offset of moduledata is within this section
+				moduleDataOffset := virtualOffset - uint64(sec.SectionHeader.VirtualAddress)
+				pclntabPtr = binary.LittleEndian.Uint32(data[moduleDataOffset:][:4])
+				virtualOffset = 0
+			}
+			
+		}
+
+		if foundpcln && !symbol_method {
 			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
-			pclntab_idx := bytes.Index(data, pclntab)
+			pclntab_idx := bytes.Index(data, pclntab_sym)
 			if pclntab_idx != -1 {
 				var candidate PclntabCandidate
-				candidate.Pclntab = pclntab
+				candidate.Pclntab = pclntab_sym
 
 				candidate.SecStart = imageBase + uint64(sec.VirtualAddress)
 				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 				candidates = append(candidates, candidate)
-				break ExitScan
+				symbol_method = true
+			}
+		}
+	}
+
+	// 4) Find the section containing the pclntab, get the offset, repair the magic, and add as a candidate
+	if pclntabPtr != 0 {
+		for _, sec := range f.pe.Sections {
+			data := f.pe.DataAfterSection(sec)
+			if uint64(pclntabPtr) >= uint64(sec.VirtualAddress) && uint64(pclntabPtr) <= uint64(sec.VirtualAddress + sec.SectionHeader.Size) {
+				pclntabOffset := uint64(pclntabPtr) - uint64(sec.VirtualAddress) - imageBase
+
+				for _, sig := range pclntab_sigs {
+					var candidate PclntabCandidate
+
+					pclntab = append(sig, data[pclntabOffset+uint64(len(sig)):]...)
+					
+					candidate.Pclntab = pclntab
+
+					candidate.SecStart = uint64(sec.VirtualAddress)
+					candidate.PclntabVA = candidate.SecStart + uint64(pclntabOffset)
+
+					candidates = append(candidates, candidate)
+				}
+				break
 			}
 		}
 	}
