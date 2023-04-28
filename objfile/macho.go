@@ -111,8 +111,6 @@ func (f *machoFile) symbols() ([]Sym, error) {
 func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	// 1) Locate pclntab via symbols (standard way)
 	foundpcln := false
-	symbol_method := false
-	var pclntab_sym []byte
 	var pclntab []byte
 	if sect := f.macho.Section("__gopclntab"); sect != nil {
 		if pclntab, err = sect.Data(); err == nil {
@@ -120,34 +118,51 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 		}
 	}
 
-	// 2) if not found, byte scan for it
-	var virtualOffset uint64 = 0
-	var pclntabPtr uint32 = 0
-	pclntab_sigs := [][]byte{
-		[]byte("\xF1\xFF\xFF\xFF\x00\x00"),
+	pclntab_sigs_le := [][]byte{
+		[]byte("\xF1\xFF\xFF\xFF\x00\x00"), // little endian
 		[]byte("\xF0\xFF\xFF\xFF\x00\x00"),
 		[]byte("\xFA\xFF\xFF\xFF\x00\x00"),
-		[]byte("\xFB\xFF\xFF\xFF\x00\x00"),   
-		[]byte("\xFF\xFF\xFF\xFB\x00\x00"), 
-		[]byte("\xFF\xFF\xFF\xFA\x00\x00"), 
-		[]byte("\xFF\xFF\xFF\xF0\x00\x00"), 
+		[]byte("\xFB\xFF\xFF\xFF\x00\x00"),
+	}
+
+	pclntab_sigs_be := [][]byte{
+		[]byte("\xFF\xFF\xFF\xFB\x00\x00"), // big endian
+		[]byte("\xFF\xFF\xFF\xFA\x00\x00"),
+		[]byte("\xFF\xFF\xFF\xF0\x00\x00"),
 		[]byte("\xFF\xFF\xFF\xF1\x00\x00"),
 	}
+
+	// 2) if not found, byte scan for it
+	pclntab_sigs := append(pclntab_sigs_le, pclntab_sigs_be...)
+
+	// candidate array for method 4 of scanning
+	var stompedmagic_candidates []StompMagicCandidate = make([]StompMagicCandidate, 0)
+
+	// 2) if not found, byte scan for it
 	for _, sec := range f.macho.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-
 		data := f.macho.DataAfterSection(sec)
-		sectionData, _ := sec.Data()
-		if uint64(len(data)) < sec.Size {
-			continue
-		}
 
-		// https://github.com/golang/go/blob/2cb9042dc2d5fdf6013305a077d013dbbfbaac06/src/debug/gosym/pclntab.go#L172
-		matches := findAllOccurrences(data, pclntab_sigs)
-		for _, pclntab_idx := range matches {
-			if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
-				pclntab = data[pclntab_idx:]
+		if !foundpcln {
+			matches := findAllOccurrences(data, pclntab_sigs)
+			for _, pclntab_idx := range matches {
+				if pclntab_idx != -1 && pclntab_idx < int(sec.Size) {
+					pclntab = data[pclntab_idx:]
 
+					var candidate PclntabCandidate
+					candidate.Pclntab = pclntab
+
+					candidate.SecStart = uint64(sec.Addr)
+					candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
+
+					candidates = append(candidates, candidate)
+					// we must scan all signature for all sections. DO NOT BREAK
+				}
+			}
+		} else {
+			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
+			pclntab_idx := bytes.Index(data, pclntab)
+			if pclntab_idx != -1 {
 				var candidate PclntabCandidate
 				candidate.Pclntab = pclntab
 
@@ -155,62 +170,99 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
 
 				candidates = append(candidates, candidate)
-				// we must scan all signature for all sections. DO NOT BREAK
 			}
 		}
-		
-		pcHeader := findModuleInitPCHeader(machoScanner, sectionData)
-		if len(pcHeader) == 2 {
-			virtualOffset = (pcHeader[1] + sec.Addr) + pcHeader[0]
+
+		var moduleDataVA uint64 = 0
+
+		// TODO this scan needs to occur in both big and little endian mode
+		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
+		sigResult := findModuleInitPCHeader(data)
+		if sigResult != nil {
+			moduleDataVA = sigResult.moduleDataRVA + uint64(sec.Addr)
 		}
 
-		if virtualOffset != 0 {
-			if virtualOffset >= sec.Addr && virtualOffset <= (sec.Addr + sec.Size) {
-				// The virtual offset of moduledata is within this section
-				moduleDataOffset := virtualOffset - sec.Addr
-				pclntabPtr = binary.LittleEndian.Uint32(data[moduleDataOffset:][:4])
-				virtualOffset = 0
+		// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
+		// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
+		// 0x000000000069D0C0                                                                 ; runtime_scanstack+40B↑o ...
+		// 0x000000000069D0C8 40 F7 5D 00 00 00 00 00                 dq offset aInternalCpuIni ; "internal/cpu.Initialize"
+		// 0x000000000069D0D0 F0                                      db 0F0h
+		// 0x000000000069D0D1 BB                                      db 0BBh
+
+		// we don't know the endianess or arch, so we submit all combinations as candidates and sort them out later
+		// example: reads out ptr unk_5DF6E0
+		pclntabVARaw64, err := f.read_memory(moduleDataVA, 8) // assume 64bit
+		if err == nil {
+			stompedMagicCandidateLE := StompMagicCandidate{
+				binary.LittleEndian.Uint64(pclntabVARaw64),
+				moduleDataVA,
+				true,
 			}
-			
-		}
-
-		if foundpcln && !symbol_method {
-			// 3) if we found it earlier, figure out which section base to return (might be wrong for packed things)
-			pclntab_idx := bytes.Index(data, pclntab_sym)
-			if pclntab_idx != -1 {
-				var candidate PclntabCandidate
-				candidate.Pclntab = pclntab_sym
-
-				candidate.SecStart = uint64(sec.Addr)
-				candidate.PclntabVA = candidate.SecStart + uint64(pclntab_idx)
-
-				candidates = append(candidates, candidate)
-
-				symbol_method = true
+			stompedMagicCandidateBE := StompMagicCandidate{
+				binary.BigEndian.Uint64(pclntabVARaw64),
+				moduleDataVA,
+				false,
+			}
+			stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+		} else {
+			pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
+			if err == nil {
+				stompedMagicCandidateLE := StompMagicCandidate{
+					uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+					moduleDataVA,
+					true,
+				}
+				stompedMagicCandidateBE := StompMagicCandidate{
+					uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+					moduleDataVA,
+					false,
+				}
+				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
 			}
 		}
 	}
 
-	// 4) Find the section containing the pclntab, get the offset, repair the magic, and add as a candidate
-	if pclntabPtr != 0 {
+	if len(stompedmagic_candidates) != 0 {
 		for _, sec := range f.macho.Sections {
+			// malware can split the pclntab across multiple sections, re-merge
 			data := f.macho.DataAfterSection(sec)
-			if uint64(pclntabPtr) >= sec.Addr && uint64(pclntabPtr) <= (sec.Addr + sec.Size) {
-				pclntabOffset := uint64(pclntabPtr) - sec.Addr
+			for _, stompedMagicCandidate := range stompedmagic_candidates {
+				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
-				for _, sig := range pclntab_sigs {
-					var candidate PclntabCandidate
+				if pclntab_va_candidate >= sec.Addr && pclntab_va_candidate < (sec.Addr+sec.Size) {
+					sec_offset := pclntab_va_candidate - sec.Addr
+					pclntab = data[sec_offset:]
 
-					pclntab = append(sig, data[pclntabOffset+uint64(len(sig)):]...)
-					
-					candidate.Pclntab = pclntab
+					if stompedMagicCandidate.LittleEndian {
+						for _, magicLE := range pclntab_sigs_le {
+							pclntab_copy := make([]byte, len(pclntab))
+							copy(pclntab_copy, pclntab)
+							copy(pclntab_copy, magicLE)
 
-					candidate.SecStart = uint64(sec.Addr)
-					candidate.PclntabVA = candidate.SecStart + uint64(pclntabOffset)
+							var candidate PclntabCandidate
+							candidate.StompMagicCandidateMeta = &stompedMagicCandidate
+							candidate.Pclntab = pclntab_copy
+							candidate.SecStart = uint64(sec.Addr)
+							candidate.PclntabVA = pclntab_va_candidate
 
-					candidates = append(candidates, candidate)
+							candidates = append(candidates, candidate)
+						}
+					} else {
+						for _, magicBE := range pclntab_sigs_be {
+							pclntab_copy := make([]byte, len(pclntab))
+							copy(pclntab_copy, pclntab)
+							copy(pclntab_copy, magicBE)
+
+							var candidate PclntabCandidate
+							candidate.StompMagicCandidateMeta = &stompedMagicCandidate
+							candidate.Pclntab = pclntab_copy
+							candidate.SecStart = uint64(sec.Addr)
+							candidate.PclntabVA = pclntab_va_candidate
+
+							candidates = append(candidates, candidate)
+						}
+					}
 				}
-				break
 			}
 		}
 	}
@@ -287,11 +339,9 @@ scan:
 				secStart = sec.Addr
 
 				// optionally consult ignore list, to skip past previous (bad) scan results
-				if ignorelist != nil {
-					for _, ignore := range ignorelist {
-						if ignore == moduledataVA {
-							continue scan
-						}
+				for _, ignore := range ignorelist {
+					if ignore == moduledataVA {
+						continue scan
 					}
 				}
 
