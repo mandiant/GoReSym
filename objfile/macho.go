@@ -109,6 +109,8 @@ func (f *machoFile) symbols() ([]Sym, error) {
 }
 
 func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
+	imageBase, _ := f.loadAddress()
+
 	// 1) Locate pclntab via symbols (standard way)
 	foundpcln := false
 	var pclntab []byte
@@ -177,47 +179,45 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
-		sigResult := findModuleInitPCHeader(data)
-		if sigResult != nil {
-			moduleDataVA = sigResult.moduleDataRVA + uint64(sec.Addr)
-		}
+		sigResults := findModuleInitPCHeader(data, sec.Addr, imageBase)
+		for _, sigResult := range sigResults {
+			// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
+			// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
+			// 0x000000000069D0C0                                                                 ; runtime_scanstack+40B↑o ...
+			// 0x000000000069D0C8 40 F7 5D 00 00 00 00 00                 dq offset aInternalCpuIni ; "internal/cpu.Initialize"
+			// 0x000000000069D0D0 F0                                      db 0F0h
+			// 0x000000000069D0D1 BB                                      db 0BBh
 
-		// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
-		// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
-		// 0x000000000069D0C0                                                                 ; runtime_scanstack+40B↑o ...
-		// 0x000000000069D0C8 40 F7 5D 00 00 00 00 00                 dq offset aInternalCpuIni ; "internal/cpu.Initialize"
-		// 0x000000000069D0D0 F0                                      db 0F0h
-		// 0x000000000069D0D1 BB                                      db 0BBh
-
-		// we don't know the endianess or arch, so we submit all combinations as candidates and sort them out later
-		// example: reads out ptr unk_5DF6E0
-		pclntabVARaw64, err := f.read_memory(moduleDataVA, 8) // assume 64bit
-		if err == nil {
-			stompedMagicCandidateLE := StompMagicCandidate{
-				binary.LittleEndian.Uint64(pclntabVARaw64),
-				moduleDataVA,
-				true,
-			}
-			stompedMagicCandidateBE := StompMagicCandidate{
-				binary.BigEndian.Uint64(pclntabVARaw64),
-				moduleDataVA,
-				false,
-			}
-			stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
-		} else {
-			pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
+			// we don't know the endianess or arch, so we submit all combinations as candidates and sort them out later
+			// example: reads out ptr unk_5DF6E0
+			pclntabVARaw64, err := f.read_memory(sigResult.moduleDataVA, 8) // assume 64bit
 			if err == nil {
 				stompedMagicCandidateLE := StompMagicCandidate{
-					uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+					binary.LittleEndian.Uint64(pclntabVARaw64),
 					moduleDataVA,
 					true,
 				}
 				stompedMagicCandidateBE := StompMagicCandidate{
-					uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+					binary.BigEndian.Uint64(pclntabVARaw64),
 					moduleDataVA,
 					false,
 				}
 				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+			} else {
+				pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
+				if err == nil {
+					stompedMagicCandidateLE := StompMagicCandidate{
+						uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+						moduleDataVA,
+						true,
+					}
+					stompedMagicCandidateBE := StompMagicCandidate{
+						uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+						moduleDataVA,
+						false,
+					}
+					stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+				}
 			}
 		}
 	}

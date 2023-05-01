@@ -212,51 +212,50 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
-		sigResult := findModuleInitPCHeader(data)
-		if sigResult != nil {
-			moduleDataVA = sigResult.moduleDataRVA + imageBase + uint64(sec.VirtualAddress)
-		}
+		sigResults := findModuleInitPCHeader(data, uint64(sec.VirtualAddress), imageBase)
+		for _, sigResult := range sigResults {
+			// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
+			// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
+			// 0x000000000069D0C0                                                                 ; runtime_scanstack+40B↑o ...
+			// 0x000000000069D0C8 40 F7 5D 00 00 00 00 00                 dq offset aInternalCpuIni ; "internal/cpu.Initialize"
+			// 0x000000000069D0D0 F0                                      db 0F0h
+			// 0x000000000069D0D1 BB                                      db 0BBh
 
-		// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
-		// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
-		// 0x000000000069D0C0                                                                 ; runtime_scanstack+40B↑o ...
-		// 0x000000000069D0C8 40 F7 5D 00 00 00 00 00                 dq offset aInternalCpuIni ; "internal/cpu.Initialize"
-		// 0x000000000069D0D0 F0                                      db 0F0h
-		// 0x000000000069D0D1 BB                                      db 0BBh
-
-		// we don't know the endianess or arch, so we submit all combinations as candidates and sort them out later
-		// example: reads out ptr unk_5DF6E0
-		pclntabVARaw64, err := f.read_memory(moduleDataVA, 8) // assume 64bit
-		if err == nil {
-			stompedMagicCandidateLE := StompMagicCandidate{
-				binary.LittleEndian.Uint64(pclntabVARaw64),
-				moduleDataVA,
-				true,
-			}
-			stompedMagicCandidateBE := StompMagicCandidate{
-				binary.BigEndian.Uint64(pclntabVARaw64),
-				moduleDataVA,
-				false,
-			}
-			stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
-		} else {
-			pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
+			// we don't know the endianess or arch, so we submit all combinations as candidates and sort them out later
+			// example: reads out ptr unk_5DF6E0
+			pclntabVARaw64, err := f.read_memory(sigResult.moduleDataVA, 8) // assume 64bit
 			if err == nil {
 				stompedMagicCandidateLE := StompMagicCandidate{
-					uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+					binary.LittleEndian.Uint64(pclntabVARaw64),
 					moduleDataVA,
 					true,
 				}
 				stompedMagicCandidateBE := StompMagicCandidate{
-					uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+					binary.BigEndian.Uint64(pclntabVARaw64),
 					moduleDataVA,
 					false,
 				}
 				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+			} else {
+				pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
+				if err == nil {
+					stompedMagicCandidateLE := StompMagicCandidate{
+						uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+						moduleDataVA,
+						true,
+					}
+					stompedMagicCandidateBE := StompMagicCandidate{
+						uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+						moduleDataVA,
+						false,
+					}
+					stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+				}
 			}
 		}
 	}
 
+	// 4.1) Take the pclntab stomped candidates, and read the pclntab data at each location. Usually the BIG/LITTLE endian pointers that are invalid are filtered out here
 	if len(stompedmagic_candidates) != 0 {
 		for _, sec := range f.pe.Sections {
 			// malware can split the pclntab across multiple sections, re-merge
@@ -264,12 +263,15 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			for _, stompedMagicCandidate := range stompedmagic_candidates {
 				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
+				// We must ensure our pointer starts within the first section of the data returned by DataAfterSection so that we use the right base address
 				if pclntab_va_candidate >= (imageBase+uint64(sec.VirtualAddress)) && pclntab_va_candidate < (imageBase+uint64(sec.VirtualAddress)+uint64(sec.Size)) {
 					sec_offset := pclntab_va_candidate - (imageBase + uint64(sec.VirtualAddress))
 					pclntab = data[sec_offset:]
 
 					if stompedMagicCandidate.LittleEndian {
 						for _, magicLE := range pclntab_sigs_le {
+							// Make a copy of the pclntab with each magic possible. For when the magic is intentionally corrupted
+							// Parsing will fail at some later point for the magics that don't match the version, filtering out that candidate
 							pclntab_copy := make([]byte, len(pclntab))
 							copy(pclntab_copy, pclntab)
 							copy(pclntab_copy, magicLE)
@@ -284,6 +286,8 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 						}
 					} else {
 						for _, magicBE := range pclntab_sigs_be {
+							// Make a copy of the pclntab with each magic possible. For when the magic is intentionally corrupted
+							// Parsing will fail at some later point for the magics that don't match the version, filtering out that candidate
 							pclntab_copy := make([]byte, len(pclntab))
 							copy(pclntab_copy, pclntab)
 							copy(pclntab_copy, magicBE)
