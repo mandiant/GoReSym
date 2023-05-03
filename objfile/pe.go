@@ -208,8 +208,6 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			}
 		}
 
-		var moduleDataVA uint64 = 0
-
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
 		sigResults := findModuleInitPCHeader(data, uint64(sec.VirtualAddress), imageBase)
@@ -227,30 +225,30 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			if err == nil {
 				stompedMagicCandidateLE := StompMagicCandidate{
 					binary.LittleEndian.Uint64(pclntabVARaw64),
-					moduleDataVA,
+					sigResult.moduleDataVA,
 					true,
 				}
 				stompedMagicCandidateBE := StompMagicCandidate{
 					binary.BigEndian.Uint64(pclntabVARaw64),
-					moduleDataVA,
+					sigResult.moduleDataVA,
 					false,
 				}
 				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
-			} else {
-				pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
-				if err == nil {
-					stompedMagicCandidateLE := StompMagicCandidate{
-						uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
-						moduleDataVA,
-						true,
-					}
-					stompedMagicCandidateBE := StompMagicCandidate{
-						uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
-						moduleDataVA,
-						false,
-					}
-					stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+			}
+
+			pclntabVARaw32, err := f.read_memory(sigResult.moduleDataVA, 4) // assume 32bit
+			if err == nil {
+				stompedMagicCandidateLE := StompMagicCandidate{
+					uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+					sigResult.moduleDataVA,
+					true,
 				}
+				stompedMagicCandidateBE := StompMagicCandidate{
+					uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+					sigResult.moduleDataVA,
+					false,
+				}
+				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
 			}
 		}
 	}

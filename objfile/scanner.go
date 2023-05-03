@@ -4,10 +4,18 @@ import (
 	"encoding/binary"
 )
 
-type signatureModuleDataInitx86_x64 struct {
+type signatureModuleDataInitx64 struct {
 	moduleDataPtrLoc       uint8  // offset in signature to the location of the pointer to the PCHeader
 	moduleDataPtrOffsetLoc uint8  // Ptr is a relative ptr, we need to include the instruction length + next instruction IP to resolve final VA
 	signature              []byte // signature to search for (0x90 is wildcard)
+}
+
+type signatureModuleDataInitx86 struct {
+	moduleDataPtrLoc    uint8  // offset in signature to the location of the pointer to the PCHeader (ptr is absolute addr)
+	moduleDataSignature []byte // signature to search for (0x90 is wildcard)
+
+	loopMaxDistanceFromModuleData uint16 // max distance between moduleDataSignature match and loopSignature
+	loopSignature                 []byte
 }
 
 type signatureModuleDataInitPPC struct {
@@ -20,8 +28,18 @@ type SignatureMatch struct {
 	moduleDataVA uint64
 }
 
-// TODO: Support more architectures in this mode
-var x64sig = signatureModuleDataInitx86_x64{21, 25, []byte("48 8D 05 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 0D ?? ?? ?? ?? EB 0D")}
+var x64sig = signatureModuleDataInitx64{21, 25, []byte("48 8D 05 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 0D ?? ?? ?? ?? EB 0D")}
+
+// .text:00438A94 8D 05 60 49 6A 00                       lea     eax, off_6A4960
+// .text:00438A9A EB 1A                                   jmp     short loc_438AB6
+// ...gap...
+// .text:00438AAC 8B 80 18 01 00 00                       mov     eax, [eax+118h]
+// .text:00438AB2 8B 54 24 20                             mov     edx, [esp+2Ch+var_C]
+// .text:00438AB6
+// .text:00438AB6                         loc_438AB6:                             ; CODE XREF: sub_438A60+3A↑j
+// .text:00438AB6 85 C0                                   test    eax, eax
+// .text:00438AB8 75 E2                                   jnz     short loc_438A9C
+var x86sig = signatureModuleDataInitx86{2, []byte("8D ?? ?? ?? ?? ?? EB 1A"), 50, []byte("8B ?? ?? ?? ?? ?? 8B ?? 24 20 85 ?? 75 E2")}
 
 // 0x0000000000061a74:  3C 80 00 2C    lis  r4, 0x2c       // moduledata
 // 0x0000000000061a78:  38 84 80 00    addi r4, r4, 0x8000  // moduledata ((0x2c << 16) + 0x8000)
@@ -98,6 +116,19 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64, imageBase uint64) [
 		return []SignatureMatch{{
 			moduleDataPtrOffset + moduleDataIpOffset + sectionBase,
 		}}
+	})...)
+
+	// x86 scan
+	matches = append(matches, findPattern(data, x86sig.moduleDataSignature, func(sigPtr uint64) []SignatureMatch {
+		return findPattern(data[sigPtr:], x86sig.loopSignature, func(sigPtr2 uint64) []SignatureMatch {
+			if sigPtr2 < uint64(x86sig.loopMaxDistanceFromModuleData) {
+				moduleDataPtr := uint64(binary.LittleEndian.Uint32(data[sigPtr+uint64(x86sig.moduleDataPtrLoc):][:4]))
+				return []SignatureMatch{{
+					moduleDataPtr,
+				}}
+			}
+			return make([]SignatureMatch, 0)
+		})
 	})...)
 
 	// PPC BE scan
