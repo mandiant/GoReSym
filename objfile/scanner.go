@@ -20,7 +20,7 @@ type SignatureMatch struct {
 	moduleDataVA uint64
 }
 
-// TODO: Support more architectures in this mode - will involve big endian support for at least ppc64 (just one pointer read in the scanner here)
+// TODO: Support more architectures in this mode
 var x64sig = signatureModuleDataInitx86_x64{21, 25, []byte("48 8D 05 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 0D ?? ?? ?? ?? EB 0D")}
 
 // 0x0000000000061a74:  3C 80 00 2C    lis  r4, 0x2c       // moduledata
@@ -102,12 +102,14 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64, imageBase uint64) [
 
 	// PPC BE scan
 	matches = append(matches, findPattern(data, PPC_BE_sig.signature, func(sigPtr uint64) []SignatureMatch {
-		moduleDataPtrHi := uint64(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrHi):][:2]))
-		moduleDataPtrLo := uint64(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrLo):][:2]))
+		moduleDataPtrHi := int64(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrHi):][:2]))
 
-		moduleDataIpOffset := (moduleDataPtrHi << 16) + moduleDataPtrLo
+		// addi takes a signed immediate
+		moduleDataPtrLo := int64(int16(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrLo):][:2])))
+
+		moduleDataIpOffset := uint64((moduleDataPtrHi << 16) + moduleDataPtrLo)
 		return []SignatureMatch{{
-			moduleDataIpOffset - imageBase,
+			moduleDataIpOffset,
 		}}
 	})...)
 
