@@ -210,7 +210,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
-		sigResults := findModuleInitPCHeader(data, uint64(sec.VirtualAddress), imageBase)
+		sigResults := findModuleInitPCHeader(data, uint64(sec.VirtualAddress)+imageBase)
 		for _, sigResult := range sigResults {
 			// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
 			// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
@@ -251,6 +251,36 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
 			}
 		}
+	}
+
+	// even if we found the pclntab without signature scanning it may have a stomped magic. That would break parsing later! So, let's submit new candidates
+	// with all the possible magics to get at least one that hopefully parses correctly.
+	patched_magic_candidates := make([]PclntabCandidate, 0)
+	for _, candidate := range candidates {
+		has_some_valid_magic := false
+		for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
+			if bytes.Equal(candidate.Pclntab, magic) {
+				has_some_valid_magic = true
+				break
+			}
+		}
+
+		if !has_some_valid_magic {
+			for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
+				pclntab_copy := make([]byte, len(candidate.Pclntab))
+				copy(pclntab_copy, candidate.Pclntab)
+				copy(pclntab_copy, magic)
+
+				new_candidate := candidate
+				new_candidate.Pclntab = pclntab_copy
+				patched_magic_candidates = append(patched_magic_candidates, new_candidate)
+				candidate.Pclntab = pclntab_copy
+			}
+		}
+	}
+
+	if len(patched_magic_candidates) > 0 {
+		candidates = patched_magic_candidates
 	}
 
 	// 4.1) Take the pclntab stomped candidates, and read the pclntab data at each location. Usually the BIG/LITTLE endian pointers that are invalid are filtered out here

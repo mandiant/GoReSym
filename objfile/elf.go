@@ -87,8 +87,6 @@ func (f *elfFile) symbols() ([]Sym, error) {
 }
 
 func (f *elfFile) pcln_scan() (candidates []PclntabCandidate, err error) {
-	imageBase, _ := f.loadAddress()
-
 	// 1) Locate pclntab via symbols (standard way)
 	foundpcln := false
 	var pclntab []byte
@@ -155,11 +153,9 @@ func (f *elfFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			}
 		}
 
-		var moduleDataVA uint64 = 0
-
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
-		sigResults := findModuleInitPCHeader(data, sec.Addr, imageBase)
+		sigResults := findModuleInitPCHeader(data, sec.Addr)
 		for _, sigResult := range sigResults {
 			// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
 			// 0x000000000069D0C0 E0 F6 5D 00 00 00 00 00 off_69D0C0      dq offset unk_5DF6E0    ; DATA XREF: runtime_SetFinalizer+119↑o
@@ -174,32 +170,62 @@ func (f *elfFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			if err == nil {
 				stompedMagicCandidateLE := StompMagicCandidate{
 					binary.LittleEndian.Uint64(pclntabVARaw64),
-					moduleDataVA,
+					sigResult.moduleDataVA,
 					true,
 				}
 				stompedMagicCandidateBE := StompMagicCandidate{
 					binary.BigEndian.Uint64(pclntabVARaw64),
-					moduleDataVA,
+					sigResult.moduleDataVA,
 					false,
 				}
 				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
-			} else {
-				pclntabVARaw32, err := f.read_memory(moduleDataVA, 4) // assume 32bit
-				if err == nil {
-					stompedMagicCandidateLE := StompMagicCandidate{
-						uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
-						moduleDataVA,
-						true,
-					}
-					stompedMagicCandidateBE := StompMagicCandidate{
-						uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
-						moduleDataVA,
-						false,
-					}
-					stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
+			}
+
+			pclntabVARaw32, err := f.read_memory(sigResult.moduleDataVA, 4) // assume 32bit
+			if err == nil {
+				stompedMagicCandidateLE := StompMagicCandidate{
+					uint64(binary.LittleEndian.Uint32(pclntabVARaw32)),
+					sigResult.moduleDataVA,
+					true,
 				}
+				stompedMagicCandidateBE := StompMagicCandidate{
+					uint64(binary.BigEndian.Uint32(pclntabVARaw32)),
+					sigResult.moduleDataVA,
+					false,
+				}
+				stompedmagic_candidates = append(stompedmagic_candidates, stompedMagicCandidateLE, stompedMagicCandidateBE)
 			}
 		}
+	}
+
+	// even if we found the pclntab without signature scanning it may have a stomped magic. That would break parsing later! So, let's submit new candidates
+	// with all the possible magics to get at least one that hopefully parses correctly.
+	patched_magic_candidates := make([]PclntabCandidate, 0)
+	for _, candidate := range candidates {
+		has_some_valid_magic := false
+		for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
+			if bytes.Equal(candidate.Pclntab, magic) {
+				has_some_valid_magic = true
+				break
+			}
+		}
+
+		if !has_some_valid_magic {
+			for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
+				pclntab_copy := make([]byte, len(candidate.Pclntab))
+				copy(pclntab_copy, candidate.Pclntab)
+				copy(pclntab_copy, magic)
+
+				new_candidate := candidate
+				new_candidate.Pclntab = pclntab_copy
+				patched_magic_candidates = append(patched_magic_candidates, new_candidate)
+				candidate.Pclntab = pclntab_copy
+			}
+		}
+	}
+
+	if len(patched_magic_candidates) > 0 {
+		candidates = patched_magic_candidates
 	}
 
 	if len(stompedmagic_candidates) != 0 {

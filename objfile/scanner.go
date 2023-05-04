@@ -28,7 +28,11 @@ type SignatureMatch struct {
 	moduleDataVA uint64
 }
 
-var x64sig = signatureModuleDataInitx64{21, 25, []byte("48 8D 05 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 0D ?? ?? ?? ?? EB 0D")}
+// .text:000000000044D80A 48 8D 0D 8F DA 26 00                    lea     rcx, runtime_firstmoduledata
+// .text:000000000044D811 EB 0D                                   jmp     short loc_44D820
+// .text:000000000044D813 48 8B 89 30 02 00 00                    mov     rcx, [rcx+230h]
+// .text:000000000044D81A 66 0F 1F 44 00 00                       nop     word ptr [rax+rax+00h]    <- always seems to be present
+var x64sig = signatureModuleDataInitx64{3, 7, []byte("48 8D 0? ?? ?? ?? ?? EB ?? 48 8? 8? ?? 02 00 00 66 0F 1F 44 00 00")}
 
 // .text:00438A94 8D 05 60 49 6A 00                       lea     eax, off_6A4960
 // .text:00438A9A EB 1A                                   jmp     short loc_438AB6
@@ -97,7 +101,7 @@ func findPattern(data []byte, signature []byte, callback func(uint64) []Signatur
 	return matches
 }
 
-func findModuleInitPCHeader(data []byte, sectionBase uint64, imageBase uint64) []SignatureMatch {
+func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	var matches []SignatureMatch = make([]SignatureMatch, 0)
 
 	// x64 scan
