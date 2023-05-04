@@ -43,7 +43,7 @@ var x64sig = signatureModuleDataInitx64{3, 7, []byte("48 8D 0? ?? ?? ?? ?? EB ??
 // .text:00438AB6                         loc_438AB6:                             ; CODE XREF: sub_438A60+3A↑j
 // .text:00438AB6 85 C0                                   test    eax, eax
 // .text:00438AB8 75 E2                                   jnz     short loc_438A9C
-var x86sig = signatureModuleDataInitx86{2, []byte("8D ?? ?? ?? ?? ?? EB 1A"), 50, []byte("8B ?? ?? ?? ?? ?? 8B ?? 24 20 85 ?? 75 E2")}
+var x86sig = signatureModuleDataInitx86{2, []byte("8D ?? ?? ?? ?? ?? EB ??"), 50, []byte("8B ?? ?? 01 00 00 8B ?? ?? ?? 85 ?? 75 ??")}
 
 // 0x0000000000061a74:  3C 80 00 2C    lis  r4, 0x2c       // moduledata
 // 0x0000000000061a78:  38 84 80 00    addi r4, r4, 0x8000  // moduledata ((0x2c << 16) + 0x8000)
@@ -51,7 +51,7 @@ var x86sig = signatureModuleDataInitx86{2, []byte("8D ?? ?? ?? ?? ?? EB 1A"), 50
 // 0x0000000000061a80:  E8 84 02 30    ld   r4, 0x230(r4)
 // 0x0000000000061a84:  7C 24 00 00    cmpd r4, r0
 // 0x0000000000061a88:  41 82 01 A8    beq  0x61c30
-var PPC_BE_sig = signatureModuleDataInitPPC{2, 6, []byte("3? 80 00 2C 3? ?? 80 00 48 ?? ?? 08 E? ?? 02 30 7C ?? 00 00 41 82 ?? ??")}
+var PPC_BE_sig = signatureModuleDataInitPPC{2, 6, []byte("3? 80 00 ?? 3? ?? ?? ?? 48 ?? ?? ?? E? ?? 02 ?? 7C ?? ?? ?? 41 82 ?? ??")}
 
 func getPatternSize(signature []byte) int {
 	// c = 2 * b + (b - 1) . 2 chars per byte + b - 1 spaces between
