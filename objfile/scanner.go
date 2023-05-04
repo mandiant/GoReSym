@@ -68,7 +68,7 @@ func findPattern(data []byte, signature []byte, callback func(uint64) []Signatur
 	patternSize := getPatternSize(signature)
 	for i := range data {
 		sigIdx := 0
-		for sigIdx < patternSize {
+		for sigIdx < patternSize && i+sigIdx < len(data) {
 			sigPatIdx := sigIdx * 3
 			sigHi := getBits(signature[sigPatIdx:][0]) << 4
 			sigLo := getBits(signature[sigPatIdx:][1])

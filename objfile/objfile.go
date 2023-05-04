@@ -1501,7 +1501,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			structDef := "type struct {"
-			if *&_type.flags&tflagNamed != 0 {
+			if _type.flags&tflagNamed != 0 {
 				structDef = fmt.Sprintf("type %s struct {", _type.Str)
 			}
 
