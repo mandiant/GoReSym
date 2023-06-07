@@ -7,4 +7,7 @@ require (
 	google.golang.org/protobuf v1.28.1
 )
 
-require github.com/elliotchance/orderedmap v1.4.0
+require (
+	github.com/elliotchance/orderedmap v1.4.0
+	github.com/hillu/go-yara/v4 v4.3.2
+)

@@ -126,10 +126,10 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	}
 
 	pclntab_sigs_be := [][]byte{
-		[]byte("\xFF\xFF\xFF\xFB\x00\x00"), // big endian
-		[]byte("\xFF\xFF\xFF\xFA\x00\x00"),
+		[]byte("\xFF\xFF\xFF\xF1\x00\x00"), // big endian
 		[]byte("\xFF\xFF\xFF\xF0\x00\x00"),
-		[]byte("\xFF\xFF\xFF\xF1\x00\x00"),
+		[]byte("\xFF\xFF\xFF\xFA\x00\x00"),
+		[]byte("\xFF\xFF\xFF\xFB\x00\x00"),
 	}
 
 	// 2) if not found, byte scan for it
@@ -175,6 +175,7 @@ func (f *machoFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 
 		// TODO this scan needs to occur in both big and little endian mode
 		// 4) Always try this other way! Sometimes the pclntab magic is stomped as well so our byte OR symbol location fail. Byte scan for the moduledata, use that to find the pclntab instead, fix up magic with all combinations.
+		// See the obfuscator 'garble' for an example of randomizing the pclntab magic
 		sigResults := findModuleInitPCHeader(data, sec.Addr)
 		for _, sigResult := range sigResults {
 			// example: off_69D0C0 is the moduleData we found via our scan, the first ptr unk_5DF6E0, is the pclntab!
