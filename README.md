@@ -11,11 +11,15 @@ The upstream Go runtime code is extended to handle:
 # Usage
 Refer to https://www.mandiant.com/resources/blog/golang-internals-symbol-recovery for reverse engineering details and example usage.
 
-You can download pre-built GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/) or build from source with a recent Go compiler:
+You can download pre-built GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/).
+
+To build from source with a recent Go compiler, install libyara manually [Lib Yara Installation](https://yara.readthedocs.io/en/stable/gettingstarted.html) then invoke the Go compiler:
 
 ```
 go build
 ```
+
+If you are cross compiling for other architectures you will need to do some configuration steps to allow `go-yara` to compile successfully for any foreign architectures [Go-Yara Cross Compilation](https://github.com/hillu/go-yara/blob/master/README.cross-building.md)
 
 Invoke GoReSym like this:
 
