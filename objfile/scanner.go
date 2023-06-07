@@ -33,6 +33,12 @@ type signatureModuleDataInitARM64 struct {
 	namespace         string
 }
 
+type signatureModuleDataInitARM32 struct {
+	moduleDataPtrLDR uint64 // offset to LDR instruction holding pc relative imm offset to PCHeader
+	signature        string
+	namespace        string
+}
+
 type SignatureMatch struct {
 	moduleDataVA uint64
 }
@@ -87,7 +93,7 @@ var PPC_BE_sig = signatureModuleDataInitPPC{2, 6, `rule PPC_BEfirstmoduledata
 // 0x000000000005C1F0 02 00 00 14        B               loc_5C1F8     0x14 00 00 02
 // 0x000000000005C1F4 21 18 41 F9        LDR             X1, [X1,#0x230]
 // 0x000000000005C1F8 21 0D 00 B4        CBZ             X1, loc_5C39C   0xb4000d21
-// var ARM64_sig = ?? ?? ?? (90 | b0 | f0 | d0) ?? ?? ?? 91 ?? ?? ?? (14 | 17) ?? ?? 41 F9 ?? ?? ?? B4
+// THIS SIG ENCODES the 0x230 struct field offset - might need to mask that more if we see misses - TODO
 var ARM64_sig = signatureModuleDataInitARM64{0, 4, `rule ARM64firstmoduledata
 {
     strings:
@@ -95,6 +101,19 @@ var ARM64_sig = signatureModuleDataInitARM64{0, 4, `rule ARM64firstmoduledata
     condition:
         $sig
 }`, "ARM64"}
+
+// 0x0006AA00 80 12 9F E5    LDR             R1, =firstmoduleData   // 0xE59F1280 -> 0b11 100101100111110001001010000000 -> size = 11,
+// 0x0006AA04 00 00 00 EA    B               loc_6AA0C
+// 0x0006AA08 18 11 91 E5    LDR             R1, [R1,#0x118]
+// 0x0006AA0C 00 00 51 E3    CMP             R1, #0
+// 0x0006AA10 69 00 00 0A    BEQ             loc_6ABBC
+var ARM32_sig = signatureModuleDataInitARM32{0, `rule ARM32firstmoduledata
+{
+    strings:
+        $sig = { ?? ?? 9F E5 ?? ?? ?? EA ?? ?? ?? E5 ?? ?? ?? E3 ?? ?? ?? 0A }
+    condition:
+        $sig
+}`, "ARM32"}
 
 func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	var matches []SignatureMatch = make([]SignatureMatch, 0)
@@ -104,6 +123,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	c.AddString(x86sig.signature, x86sig.namespace)
 	c.AddString(PPC_BE_sig.signature, PPC_BE_sig.namespace)
 	c.AddString(ARM64_sig.signature, ARM64_sig.namespace)
+	c.AddString(ARM32_sig.signature, ARM32_sig.namespace)
 	rules, err := c.GetRules()
 	if err != nil {
 		return matches
@@ -154,6 +174,16 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 				page_off := uint64((add & 0x3FFC00) >> 10)
 
 				final := page + page_off
+				matches = append(matches, SignatureMatch{
+					final,
+				})
+			} else if match.Namespace == ARM32_sig.namespace {
+				ldr := binary.LittleEndian.Uint32(data[sigPtr+ARM32_sig.moduleDataPtrLDR:][:4])
+
+				// ARM PC relative is always +8 due to legacy nonsense
+				ldr_pointer_stub := uint64((ldr & 0x00000FFF) + 8)
+				final := uint64(binary.LittleEndian.Uint32(data[sigPtr+ARM32_sig.moduleDataPtrLDR+ldr_pointer_stub:][:4]))
+
 				matches = append(matches, SignatureMatch{
 					final,
 				})
