@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -350,7 +351,12 @@ func (t *LineTable) go12Funcs() []Func {
 		}()
 	}
 
+	// avoid OOM error on corrupt binaries
 	ft := t.funcTab()
+	if ft.Count() >= math.MaxUint16 {
+		return make([]Func, 1)
+	}
+
 	funcs := make([]Func, ft.Count())
 	syms := make([]Sym, len(funcs))
 	for i := range funcs {

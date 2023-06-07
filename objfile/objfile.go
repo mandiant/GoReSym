@@ -22,12 +22,19 @@ import (
 	"github.com/mandiant/GoReSym/debug/gosym"
 )
 
+type StompMagicCandidate struct {
+	PclntabVa             uint64
+	SuspectedModuleDataVa uint64
+	LittleEndian          bool
+}
+
 type PclntabCandidate struct {
-	SecStart      uint64
-	PclntabVA     uint64
-	Pclntab       []byte
-	Symtab        []byte // optional
-	ParsedPclntab *gosym.Table
+	SecStart                uint64
+	PclntabVA               uint64
+	StompMagicCandidateMeta *StompMagicCandidate // some search modes might optimistically try to find moduledata or guess endianess, these hints must match the found moduleData VA later to be considered good candidate
+	Pclntab                 []byte
+	Symtab                  []byte // optional
+	ParsedPclntab           *gosym.Table
 }
 
 type rawFile interface {
@@ -241,7 +248,6 @@ func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]P
 
 func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
 	moduleData = &ModuleData{}
-
 	// Major version only, 1.15.5 -> 1.15
 	parts := strings.Split(runtimeVersion, ".")
 	if len(parts) >= 2 {
@@ -1495,7 +1501,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			structDef := "type struct {"
-			if *&_type.flags&tflagNamed != 0 {
+			if _type.flags&tflagNamed != 0 {
 				structDef = fmt.Sprintf("type %s struct {", _type.Str)
 			}
 

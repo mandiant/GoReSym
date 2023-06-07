@@ -110,6 +110,7 @@ Ignoring some trivial changes, most new logic exists in `/objfile`. For example,
 * `buildID` Legacy bug: [golang/go#50809](https://github.com/golang/go/issues/50809)
 
 # Changes
+*   GoReSym will now also attempt to find the pclntab based on a signature of the `runtime_modulesinit` initialization method and attempt to repair the pclntab magic (in cases where the pclntab magic has been modified).
 *   Extended `pcln()` functions in `objfile/<fileformat>` to support byte scanning the `pclntab` magic
 *   Added routines such as `DataAfterSection` to support signature scan in file format parsers in `/debug/<fileformat>`
 *  Added check to `debug/gosym/symtab.go`'s `walksymtab` to bail early when the optional `symtab` section is empty
