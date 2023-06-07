@@ -7,23 +7,30 @@ import (
 )
 
 type signatureModuleDataInitx64 struct {
-	moduleDataPtrLoc       uint8 // offset in signature to the location of the pointer to the PCHeader
-	moduleDataPtrOffsetLoc uint8 // Ptr is a relative ptr, we need to include the instruction length + next instruction IP to resolve final VA
+	moduleDataPtrLoc       uint64 // offset in signature to the location of the pointer to the PCHeader
+	moduleDataPtrOffsetLoc uint64 // Ptr is a relative ptr, we need to include the instruction length + next instruction IP to resolve final VA
 	signature              string
 	namespace              string
 }
 
 type signatureModuleDataInitx86 struct {
-	moduleDataPtrLoc uint8 // offset in signature to the location of the pointer to the PCHeader (ptr is absolute addr)
+	moduleDataPtrLoc uint64 // offset in signature to the location of the pointer to the PCHeader (ptr is absolute addr)
 	signature        string
 	namespace        string
 }
 
 type signatureModuleDataInitPPC struct {
-	moduleDataPtrHi uint8
-	moduleDataPtrLo uint8
+	moduleDataPtrHi uint64
+	moduleDataPtrLo uint64
 	signature       string
 	namespace       string
+}
+
+type signatureModuleDataInitARM64 struct {
+	moduleDataPtrADRP uint64 // offset to ADRP instruction holding PAGE address
+	moduleDataPtrADD  uint64 // offset to ADD instruction holding PAGE offset
+	signature         string
+	namespace         string
 }
 
 type SignatureMatch struct {
@@ -54,7 +61,7 @@ var x64sig = signatureModuleDataInitx64{3, 7, `rule x64firstmoduledata
 var x86sig = signatureModuleDataInitx86{2, `rule x86firstmoduledata
 {
     strings:
-        $sig = { 8D ?? ?? ?? ?? ?? EB ?? [8-50] 8B ?? ?? 01 00 00 8B ?? ?? ?? 85 ?? 75 ??}
+        $sig = { 8D ?? ?? ?? ?? ?? EB ?? [0-50] 8B ?? ?? 01 00 00 8B ?? ?? ?? 85 ?? 75 ?? }
     condition:
         $sig
 }`, "x86"}
@@ -68,7 +75,7 @@ var x86sig = signatureModuleDataInitx86{2, `rule x86firstmoduledata
 var PPC_BE_sig = signatureModuleDataInitPPC{2, 6, `rule PPC_BEfirstmoduledata
 {
     strings:
-        $sig = { 3? 80 00 ?? 3? ?? ?? ?? 48 ?? ?? ?? E? ?? 02 ?? 7C ?? ?? ?? 41 82 ?? ??}
+        $sig = { 3? 80 00 ?? 3? ?? ?? ?? 48 ?? ?? ?? E? ?? 02 ?? 7C ?? ?? ?? 41 82 ?? ?? }
     condition:
         $sig
 }`, "PPC_BE"}
@@ -81,6 +88,13 @@ var PPC_BE_sig = signatureModuleDataInitPPC{2, 6, `rule PPC_BEfirstmoduledata
 // 0x000000000005C1F4 21 18 41 F9        LDR             X1, [X1,#0x230]
 // 0x000000000005C1F8 21 0D 00 B4        CBZ             X1, loc_5C39C   0xb4000d21
 // var ARM64_sig = ?? ?? ?? (90 | b0 | f0 | d0) ?? ?? ?? 91 ?? ?? ?? (14 | 17) ?? ?? 41 F9 ?? ?? ?? B4
+var ARM64_sig = signatureModuleDataInitARM64{0, 4, `rule ARM64firstmoduledata
+{
+    strings:
+        $sig = { ?? ?? ?? (90 | b0 | f0 | d0) ?? ?? ?? 91 ?? ?? ?? (14 | 17) ?? ?? 41 F9 ?? ?? ?? B4 }
+    condition:
+        $sig
+}`, "ARM64"}
 
 func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	var matches []SignatureMatch = make([]SignatureMatch, 0)
@@ -89,6 +103,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	c.AddString(x64sig.signature, x64sig.namespace)
 	c.AddString(x86sig.signature, x86sig.namespace)
 	c.AddString(PPC_BE_sig.signature, PPC_BE_sig.namespace)
+	c.AddString(ARM64_sig.signature, ARM64_sig.namespace)
 	rules, err := c.GetRules()
 	if err != nil {
 		return matches
@@ -101,31 +116,52 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	}
 	scanner.SetCallback(&yara_matches)
 
-	scanner.ScanMem(data)
+	err = scanner.ScanMem(data)
+	if err != nil {
+		return matches
+	}
+
 	for _, match := range yara_matches {
 		for _, match_str := range match.Strings {
 			sigPtr := match_str.Offset
 			if match.Namespace == x64sig.namespace {
 				// this is the pointer offset stored in the instruction
 				// 0x44E06A:       48 8D 0D 4F F0 24 00 lea     rcx, off_69D0C0 (result: 0x24f04f)
-				moduleDataPtrOffset := uint64(binary.LittleEndian.Uint32(data[sigPtr+uint64(x64sig.moduleDataPtrLoc):][:4]))
+				moduleDataPtrOffset := uint64(binary.LittleEndian.Uint32(data[sigPtr+x64sig.moduleDataPtrLoc:][:4]))
 
 				// the ptr we get is position dependant, add the sigPtr + sectionBase to get current IP, then offset to next instruction
 				// as relative ptrs are encoded by the NEXT instruction va, not the current one
-				moduleDataIpOffset := sigPtr + sectionBase + uint64(x64sig.moduleDataPtrOffsetLoc)
+				moduleDataIpOffset := sigPtr + sectionBase + x64sig.moduleDataPtrOffsetLoc
 				matches = append(matches, SignatureMatch{
 					moduleDataPtrOffset + moduleDataIpOffset,
 				})
 			} else if match.Namespace == x86sig.namespace {
-				moduleDataPtr := uint64(binary.LittleEndian.Uint32(data[sigPtr+uint64(x86sig.moduleDataPtrLoc):][:4]))
+				moduleDataPtr := uint64(binary.LittleEndian.Uint32(data[sigPtr+x86sig.moduleDataPtrLoc:][:4]))
 				matches = append(matches, SignatureMatch{
 					moduleDataPtr,
 				})
+			} else if match.Namespace == ARM64_sig.namespace {
+				adrp := binary.LittleEndian.Uint32(data[sigPtr+ARM64_sig.moduleDataPtrADRP:][:4])
+				add := binary.LittleEndian.Uint32(data[sigPtr+ARM64_sig.moduleDataPtrADD:][:4])
+				moduleDataIpOffset := sigPtr + sectionBase
+
+				adrp_immhi := uint64((adrp & 0xFFFFF0) >> 5)
+				adrp_immlo := uint64((adrp & 0x60000000) >> 29)
+				adrp_imm := adrp_immhi<<2 | adrp_immlo                               // combine hi:lo
+				page := ((adrp_imm << 12) + moduleDataIpOffset) & 0xFFFFFFFFFFFFF000 // PAGE imm is aligned to page, left shift 12 and zero lower 12 to align
+
+				// the page offset fills in lower 12
+				page_off := uint64((add & 0x3FFC00) >> 10)
+
+				final := page + page_off
+				matches = append(matches, SignatureMatch{
+					final,
+				})
 			} else if match.Namespace == PPC_BE_sig.namespace {
-				moduleDataPtrHi := int64(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrHi):][:2]))
+				moduleDataPtrHi := int64(binary.BigEndian.Uint16(data[sigPtr+PPC_BE_sig.moduleDataPtrHi:][:2]))
 
 				// addi takes a signed immediate
-				moduleDataPtrLo := int64(int16(binary.BigEndian.Uint16(data[sigPtr+uint64(PPC_BE_sig.moduleDataPtrLo):][:2])))
+				moduleDataPtrLo := int64(int16(binary.BigEndian.Uint16(data[sigPtr+PPC_BE_sig.moduleDataPtrLo:][:2])))
 
 				moduleDataIpOffset := uint64((moduleDataPtrHi << 16) + moduleDataPtrLo)
 				matches = append(matches, SignatureMatch{
