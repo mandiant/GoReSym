@@ -4,6 +4,7 @@ import ida_bytes
 import ida_funcs
 import ida_kernwin
 import ida_name
+import ida_typeinf
 import json
 
 def iterable(obj):
