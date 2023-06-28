@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -962,6 +964,16 @@ func (e *Entry) ReadPointerSizeMem(addr uint64, is64bit bool, littleendian bool)
 	return decodePtrSizeBytes(deref, is64bit, littleendian), nil
 }
 
+func typename_to_c(typename string) string {
+	result := strings.ReplaceAll(typename, "*", "_ptr_")
+	result = strings.ReplaceAll(result, "[]", "_slice_")
+	result = strings.ReplaceAll(result, ".", "_")
+
+	arr_re := regexp.MustCompile(`\[(\d+)\]`)
+	result = arr_re.ReplaceAllString(result, "_${1}_")
+	return result
+}
+
 func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, typeAddress uint64, is64bit bool, littleendian bool, parsedTypesIn *orderedmap.OrderedMap) (*orderedmap.OrderedMap, error) {
 	// all return paths must return the original map, even if there's an error. An empty map rather than a nil simplifies recursion and allows tail calls.
 	// exit condition: type address seen before
@@ -989,7 +1001,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
+
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
 		} else {
 			var rtype Rtype15_32
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1006,7 +1019,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
 		}
 	case "1.6":
 		if is64bit {
@@ -1025,7 +1038,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
 		} else {
 			var rtype Rtype16_32
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1042,7 +1055,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
 		}
 	case "1.7":
 		fallthrough
@@ -1072,7 +1085,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
 		} else {
 			var rtype Rtype17_18_19_110_111_112_113_32
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1088,7 +1101,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
 		}
 	case "1.14":
 		fallthrough
@@ -1118,7 +1131,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
 		} else {
 			var rtype Rtype114_115_116_117_118_32
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1134,7 +1147,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
-			_type = &Type{VA: typeAddress, Str: name, Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
 		}
 	default:
 		return parsedTypesIn, fmt.Errorf("Unknown runtime version")
@@ -1150,9 +1163,22 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		ptrSize = 4
 	}
 
-	// recurse (optionally)
+	// we must parse each type to cover other types it points to
+	// this list only contains root type, we optionally recurse to parse those
+	// and then we may update the map to insert pretty reconstructed string forms of the types
 	// src/runtume/type.go
 	switch _type.kindEnum {
+	case Func:
+		//type FuncType struct {
+		//     Type
+		//     InCount  uint16
+		//     OutCount uint16 // top bit is set if last input parameter is ...
+		//}
+		//inCountAddr := typeAddress + uint64(_type.baseSize)
+		//outCountAddr := typeAddress + uint64(_type.baseSize) + uint64(unsafe.Sizeof(Uint16))
+		// TODO: parse this nicer to get C style args and return
+		(*_type).CStr = "void*"
+		parsedTypesIn.Set(typeAddress, *_type)
 	case Array:
 		// type arraytype struct {
 		// 	typ   _type
@@ -1170,7 +1196,18 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			return parsedTypesIn, fmt.Errorf("Failed to read Kind Array's slice")
 		}
 
+		arrayLen, err := e.ReadPointerSizeMem(typeAddress+uint64(_type.baseSize)+ptrSize+ptrSize, is64bit, littleendian)
+		if err != nil {
+			return parsedTypesIn, fmt.Errorf("Failed to read Kind Array's len")
+		}
+
 		parsed, _ := e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+		elemType, found := parsedTypesIn.Get(elemTypeAddress)
+		if found {
+			(*_type).Reconstructed = (*_type).Str // ends up being the same for an array
+			(*_type).CReconstructed = "typedef " + elemType.(Type).CStr + " " + (*_type).CStr + "[" + strconv.Itoa(int(arrayLen)) + "];"
+			parsed.Set(typeAddress, *_type)
+		}
 		return e.ParseType_impl(runtimeVersion, moduleData, sliceTypeAddress, is64bit, littleendian, parsed)
 	case Chan:
 		// type chantype struct {
@@ -1214,7 +1251,18 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		if err != nil {
 			return parsedTypesIn, fmt.Errorf("Failed to read Kind Slice's elem")
 		}
-		return e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+
+		parsedTypesIn, err = e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+		if err != nil {
+			return parsedTypesIn, err
+		}
+
+		elemType, found := parsedTypesIn.Get(elemTypeAddress)
+		if found {
+			(*_type).Reconstructed = "struct " + (*_type).Str + "{ ptr *" + elemType.(Type).Str + "\nlen int\ncap int }"
+			(*_type).CReconstructed = "struct " + (*_type).CStr + "{ " + elemType.(Type).CStr + "* ptr;" + "size_t len; size_t cap; }"
+			parsedTypesIn.Set(typeAddress, *_type)
+		}
 	case Pointer:
 		// type ptrtype struct {
 		// 	typ  _type
@@ -1225,7 +1273,17 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			return parsedTypesIn, fmt.Errorf("Failed to read Kind Pointer's elem")
 		}
 
-		return e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+		parsedTypesIn, err = e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+		if err != nil {
+			return parsedTypesIn, err
+		}
+
+		elemType, found := parsedTypesIn.Get(elemTypeAddress)
+		if found {
+			(*_type).Reconstructed = "type " + (*_type).Str + " = " + elemType.(Type).CStr
+			(*_type).CReconstructed = "typedef " + elemType.(Type).CStr + "* " + (*_type).CStr + ";"
+			parsedTypesIn.Set(typeAddress, *_type)
+		}
 	case Map:
 		// type mapType struct {
 		// 	rtype
@@ -1296,6 +1354,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			interfaceDef := fmt.Sprintf("type %s interface {", _type.Str)
+			cinterfaceDef := fmt.Sprintf("struct %s_interface {\n", _type.CStr)
 
 			// type imethod struct {
 			// 	name    *string // name of method
@@ -1313,11 +1372,14 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += fmt.Sprintf("\n    %s", methodfunc.(Type).Str)
+					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
+					cinterfaceDef += methodfunc.(Type).CStr + "method" + strconv.Itoa(i) + ";\n"
 				}
 			}
 			interfaceDef += "\n}"
+			cinterfaceDef += "}"
 			(*_type).Reconstructed = interfaceDef
+			(*_type).CReconstructed = cinterfaceDef
 			parsedTypesIn.Set(typeAddress, *_type)
 			return parsedTypesIn, nil
 		case "1.7":
@@ -1370,8 +1432,10 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			interfaceDef := "type interface {"
+			cinterfaceDef := "struct interface {\n"
 			if *&_type.flags&tflagNamed != 0 {
 				interfaceDef = fmt.Sprintf("type %s interface {", _type.Str)
+				cinterfaceDef = fmt.Sprintf("struct %s_interface {\n", _type.CStr)
 			}
 
 			// type imethod struct {
@@ -1396,11 +1460,14 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += fmt.Sprintf("\n    %s", methodfunc.(Type).Str)
+					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
+					cinterfaceDef += methodfunc.(Type).CStr + " method" + strconv.Itoa(i) + ";\n"
 				}
 			}
 			interfaceDef += "\n}"
+			cinterfaceDef += "}"
 			(*_type).Reconstructed = interfaceDef
+			(*_type).CReconstructed = cinterfaceDef
 			parsedTypesIn.Set(typeAddress, *_type)
 			return parsedTypesIn, nil
 		}
@@ -1436,6 +1503,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			structDef := fmt.Sprintf("type %s struct {", _type.Str)
+			cstructDef := fmt.Sprintf("struct %s {\n", _type.CStr)
 
 			// type structField struct {
 			// 	name    *string // nil for embedded fields
@@ -1459,11 +1527,14 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
 						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
+						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, typeName)
 					}
 				}
 			}
 			structDef += "\n}"
+			cstructDef += "}"
 			(*_type).Reconstructed = structDef
+			(*_type).CReconstructed = cstructDef
 			parsedTypesIn.Set(typeAddress, *_type)
 			return parsedTypesIn, nil
 		case "1.7":
@@ -1521,8 +1592,10 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			structDef := "type struct {"
+			cstructDef := "struct {\n"
 			if _type.flags&tflagNamed != 0 {
 				structDef = fmt.Sprintf("type %s struct {", _type.Str)
+				cstructDef = fmt.Sprintf("struct %s {\n", _type.CStr)
 			}
 
 			// type structField struct {
@@ -1547,11 +1620,14 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
 						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
+						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, typeName)
 					}
 				}
 			}
 			structDef += "\n}"
+			cstructDef += "}"
 			(*_type).Reconstructed = structDef
+			(*_type).CReconstructed = cstructDef
 			parsedTypesIn.Set(typeAddress, *_type)
 			return parsedTypesIn, nil
 		}

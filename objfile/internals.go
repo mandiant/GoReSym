@@ -1158,10 +1158,12 @@ func (rtype *Rtype114_115_116_117_118_32) parse(rawData []byte, littleEndian boo
 // This is a general structure that just holds the fields I care about
 // this lets us return a single type, even though rtypes change between go version
 type Type struct {
-	VA            uint64
-	Str           string
-	Kind          string
-	Reconstructed string `json:",omitempty"` // for Structs & Interfaces we can reconstruct the original definition back to Go code
+	VA             uint64
+	Str            string
+	CStr           string
+	Kind           string
+	Reconstructed  string `json:",omitempty"` // for Some types we can reconstruct the original definition back to Go code
+	CReconstructed string `json:",omitempty"` // for Some types we can reconstruct the original definition back to C code
 
 	// rtypes change between runtime versions. Depending on the 'Kind' additional data follows the 'base' rtype.
 	// We store the size so that this base type can be skipped past, and the additional data read directly in a version independant way.
