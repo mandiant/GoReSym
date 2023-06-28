@@ -284,6 +284,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					return 0, nil, err
 				}
 
+				// prevent loop on invalid modules with bogus length
+				if module.Textsectmap.Len > 0x100 {
+					continue
+				}
+
 				var textsectmap []Textsect_64
 				for i := 0; i < int(module.Textsectmap.Len); i++ {
 					var textsect Textsect_64
@@ -331,6 +336,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
 					return 0, nil, err
+				}
+
+				// prevent loop on invalid modules with bogus length
+				if module.Textsectmap.Len > 0x100 {
+					continue
 				}
 
 				var textsectmap []Textsect_32
@@ -389,6 +399,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					return 0, nil, err
 				}
 
+				// prevent loop on invalid modules with bogus length
+				if module.Textsectmap.Len > 0x100 {
+					continue
+				}
+
 				var textsectmap []Textsect_64
 				for i := 0; i < int(module.Textsectmap.Len); i++ {
 					var textsect Textsect_64
@@ -436,6 +451,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
 					return 0, nil, err
+				}
+
+				// prevent loop on invalid modules with bogus length
+				if module.Textsectmap.Len > 0x100 {
+					continue
 				}
 
 				var textsectmap []Textsect_32
