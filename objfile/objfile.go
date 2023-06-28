@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -967,10 +966,14 @@ func (e *Entry) ReadPointerSizeMem(addr uint64, is64bit bool, littleendian bool)
 func typename_to_c(typename string) string {
 	result := strings.ReplaceAll(typename, "*", "_ptr_")
 	result = strings.ReplaceAll(result, "[]", "_slice_")
+	result = strings.ReplaceAll(result, "<-", "_chan_left_")
 	result = strings.ReplaceAll(result, ".", "_")
+	result = strings.ReplaceAll(result, "[", "_")
+	result = strings.ReplaceAll(result, "]", "_")
+	result = strings.ReplaceAll(result, " ", "_")
 
-	arr_re := regexp.MustCompile(`\[(\d+)\]`)
-	result = arr_re.ReplaceAllString(result, "_${1}_")
+	// this one may be incorrect
+	result = strings.ReplaceAll(result, "{}", "")
 	return result
 }
 
@@ -1221,27 +1224,39 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		}
 
 		// append channel direction to Str of type
-		channelDir, err := e.raw.read_memory(typeAddress+uint64(_type.baseSize)+ptrSize, ptrSize)
-		if err == nil {
-			var dir string = ""
-			if is64bit {
-				if littleendian {
-					dir = (ChanDir)(binary.LittleEndian.Uint64(channelDir)).String()
-				} else {
-					dir = (ChanDir)(binary.BigEndian.Uint64(channelDir)).String()
-				}
-			} else {
-				if littleendian {
-					dir = (ChanDir)(binary.LittleEndian.Uint32(channelDir)).String()
-				} else {
-					dir = (ChanDir)(binary.BigEndian.Uint32(channelDir)).String()
-				}
-			}
+		// channelDir, err := e.raw.read_memory(typeAddress+uint64(_type.baseSize)+ptrSize, ptrSize)
+		// if err == nil {
+		// var dir string = ""
+		// if is64bit {
+		// if littleendian {
+		// dir = (ChanDir)(binary.LittleEndian.Uint64(channelDir)).String()
+		// } else {
+		// dir = (ChanDir)(binary.BigEndian.Uint64(channelDir)).String()
+		// }
+		// } else {
+		// if littleendian {
+		// dir = (ChanDir)(binary.LittleEndian.Uint32(channelDir)).String()
+		// } else {
+		// dir = (ChanDir)(binary.BigEndian.Uint32(channelDir)).String()
+		// }
+		// }
+		//
+		// _type.Str += " Direction: (" + dir + ")"
+		// }
 
-			_type.Str += " Direction: (" + dir + ")"
+		parsedTypesIn, err = e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
+		if err != nil {
+			return parsedTypesIn, err
+		}
+
+		elemType, found := parsedTypesIn.Get(elemTypeAddress)
+		if found {
+			(*_type).Str = "chan(" + elemType.(Type).Str + ")"
+			(*_type).CStr = "chan_" + elemType.(Type).CStr
+			(*_type).Reconstructed = "chan(" + elemType.(Type).Str + ")"
+			(*_type).CReconstructed = "typedef void* chan_" + elemType.(Type).CStr + ";"
 			parsedTypesIn.Set(typeAddress, *_type)
 		}
-		return e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsedTypesIn)
 	case Slice:
 		// type slicetype struct {
 		// 	typ  _type
@@ -1433,9 +1448,11 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 			interfaceDef := "type interface {"
 			cinterfaceDef := "struct interface {\n"
+			(*_type).CStr = "interface_"
 			if *&_type.flags&tflagNamed != 0 {
 				interfaceDef = fmt.Sprintf("type %s interface {", _type.Str)
 				cinterfaceDef = fmt.Sprintf("struct %s_interface {\n", _type.CStr)
+				(*_type).CStr = fmt.Sprintf("%s_interface", _type.CStr)
 			}
 
 			// type imethod struct {
