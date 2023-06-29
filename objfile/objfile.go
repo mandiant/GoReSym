@@ -977,6 +977,41 @@ func typename_to_c(typename string) string {
 	return result
 }
 
+// not exhaustive, just the likely ones to be in Go
+func replace_cpp_keywords(fieldname string) string {
+	switch fieldname {
+	case "private":
+		fallthrough
+	case "public":
+		fallthrough
+	case "protected":
+		fallthrough
+	case "friend":
+		fallthrough
+	case "register":
+		fallthrough
+	case "typename":
+		fallthrough
+	case "template":
+		fallthrough
+	case "typeid":
+		fallthrough
+	case "typedef":
+		fallthrough
+	case "default":
+		fallthrough
+	case "continue":
+		fallthrough
+	case "signed":
+		fallthrough
+	case "unsigned":
+		fallthrough
+	case "class":
+		return "_" + fieldname
+	}
+	return fieldname
+}
+
 func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, typeAddress uint64, is64bit bool, littleendian bool, parsedTypesIn *orderedmap.OrderedMap) (*orderedmap.OrderedMap, error) {
 	// all return paths must return the original map, even if there's an error. An empty map rather than a nil simplifies recursion and allows tail calls.
 	// exit condition: type address seen before
@@ -1544,7 +1579,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
 						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
-						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, typeName)
+						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
 				}
 			}
@@ -1637,7 +1672,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
 						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
-						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, typeName)
+						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
 				}
 			}
