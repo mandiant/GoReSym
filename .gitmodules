@@ -1,0 +1,3 @@
+[submodule "BinjaPython"]
+	path = BinjaPython
+	url = https://github.com/xusheng6/binja-GoReSym.git
