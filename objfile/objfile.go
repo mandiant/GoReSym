@@ -182,18 +182,23 @@ func (x byAddr) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
 func findAllOccurrences(data []byte, searches [][]byte) []int {
 	var results []int
+
 	for _, search := range searches {
-		for idx := range data {
-			if len(data[idx:]) < len(search) {
-				continue
+		var offset = 0
+
+		for {
+			var index = bytes.Index(data[offset:], search)
+			if index == -1 {
+				break
 			}
 
-			haystack := data[idx : idx+len(search)]
-			if bytes.Equal(haystack, search) {
-				results = append(results, idx)
-			}
+			offset += index
+			results = append(results, offset)
+
+			offset += 1
 		}
 	}
+
 	return results
 }
 
