@@ -13,13 +13,11 @@ Refer to https://www.mandiant.com/resources/blog/golang-internals-symbol-recover
 
 You can download pre-built `linux` and `windows` GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/).
 
-To build from source with a recent Go compiler, install libyara manually [Lib Yara Installation](https://yara.readthedocs.io/en/stable/gettingstarted.html) then invoke the Go compiler:
+To build from source with a recent Go compiler, invoke the Go compiler:
 
 ```
 go build
 ```
-
-If you are cross compiling for other architectures you will need to do some configuration steps to allow `go-yara` to compile successfully for any foreign architectures [Go-Yara Cross Compilation](https://github.com/hillu/go-yara/blob/master/README.cross-building.md). See the build script https://github.com/mandiant/GoReSym/blob/master/build_all.sh for details, only cross compilation for windows on a debian host is supported. If you need to compile for macos, it must be done natively on an apple machine.
 
 Once built invoke GoReSym like this:
 ```

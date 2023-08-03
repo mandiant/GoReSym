@@ -7,7 +7,7 @@ do
     GO_TAG=$v
     GO_VER=$(echo "$GO_TAG" | tr -d '.')
     
-    rm Dockerfile.test
+    rm -f Dockerfile.test
 cat <<EOF >Dockerfile.test
     FROM golang:$GO_TAG-alpine
     ARG ver=$GO_VER
@@ -30,4 +30,3 @@ EOF
 done
 
 rm Dockerfile.test
-
