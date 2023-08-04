@@ -57,8 +57,9 @@ type File struct {
 }
 
 type Entry struct {
-	name string
-	raw  rawFile
+	name           string
+	raw            rawFile
+	pclnCandidates []PclntabCandidate
 }
 
 // A Sym is a symbol defined in an executable file.
@@ -215,10 +216,14 @@ func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]P
 	// Otherwise, read the pcln tables and build a Liner out of that.
 	// https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169
 	// https://github.com/golang/go/issues/42954
-	candidates, err := e.raw.pcln()
-	if err != nil {
-		return nil, err
+	if e.pclnCandidates == nil {
+		candidates, err := e.raw.pcln()
+		if err != nil {
+			return nil, err
+		}
+		e.pclnCandidates = candidates
 	}
+	candidates := e.pclnCandidates
 
 	var finalCandidates []PclntabCandidate
 	var atLeastOneGood bool = false
