@@ -189,3 +189,93 @@ func RegexpFromYaraPattern(pattern string) (*binaryregexp.Regexp, error) {
 
 	return r, nil
 }
+
+type BinaryRegexpGroup struct {
+	patterns map[string]string
+
+	re *binaryregexp.Regexp
+}
+
+func NewBinaryRegexpGroup(patterns map[string]string) (*BinaryRegexpGroup, error) {
+
+	var pattern string
+
+	i := 0
+	pattern += "("
+	for k, v := range patterns {
+		if i != 0 {
+			pattern += "|"
+		}
+		i += 1
+
+		pattern += "(?P"
+		pattern += "<" + k + ">"
+		pattern += v
+		pattern += ")"
+	}
+	pattern += ")"
+
+	re := binaryregexp.MustCompile(pattern)
+	if re == nil {
+		return nil, errors.New("failed to compile regex")
+	}
+
+	return &BinaryRegexpGroup{
+		patterns: patterns,
+		re:       re,
+	}, nil
+}
+
+type BinaryRegexGroupMatches struct {
+	g       *BinaryRegexpGroup
+	matches [][]int
+}
+
+func (g *BinaryRegexpGroup) FindAllIndex(buf []byte, n int) *BinaryRegexGroupMatches {
+	matches := g.re.FindAllIndex(buf, n)
+
+	return &BinaryRegexGroupMatches{
+		g:       g,
+		matches: matches,
+	}
+}
+
+// fetch the index of the subexp for the given regexp.
+//
+// this is called `(*Regexp) SubexpIndex` in recent Go,
+// but doesn't seem to be implemented in binaryregexp.
+// https://pkg.go.dev/regexp#Regexp.SubexpIndex
+func SubexpIndex(re *binaryregexp.Regexp, name string) int {
+	for i, n := range re.SubexpNames() {
+		if n == name {
+			return i
+		}
+	}
+
+	return -1
+}
+
+// fetch the [start, end] pairs for the subexp with the given name in the given matches.
+func SubexpIndexMatches(re *binaryregexp.Regexp, matches [][]int, name string) [][]int {
+	index := SubexpIndex(re, name)
+
+	var ret [][]int
+	for _, match := range matches {
+
+		start := match[2*index]
+		end := match[2*index+1]
+
+		if start == -1 && end == -1 {
+			continue
+		}
+
+		ret = append(ret, []int{start, end})
+	}
+
+	return ret
+}
+
+// fetch the [start, end] pairs for the subexp with the given name.
+func (m *BinaryRegexGroupMatches) MatchesForSubexp(name string) [][]int {
+	return SubexpIndexMatches(m.g.re, m.matches, name)
+}
