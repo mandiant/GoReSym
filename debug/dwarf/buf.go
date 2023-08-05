@@ -132,10 +132,10 @@ func (b *buf) uint64() uint64 {
 // the 0x80 bit means read another byte.
 func (b *buf) varint() (c uint64, bits uint) {
 	for i := 0; i < len(b.data); i++ {
-		byte := b.data[i]
-		c |= uint64(byte&0x7F) << bits
+		bytes := b.data[i]
+		c |= uint64(bytes&0x7F) << bits
 		bits += 7
-		if byte&0x80 == 0 {
+		if bytes&0x80 == 0 {
 			b.off += Offset(i + 1)
 			b.data = b.data[i+1:]
 			return c, bits

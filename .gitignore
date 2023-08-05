@@ -17,3 +17,10 @@ Dockerfile.test
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# IDEs
+.project
+.pydevproject
+.idea
+org.eclipse.core.resources.prefs
+.vscode
+.vs

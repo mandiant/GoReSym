@@ -229,7 +229,7 @@ func formToClass(form format, attr Attr, vers int, b *buf) Class {
 	}
 }
 
-// An entry is a sequence of attribute/value pairs.
+// Entry is a sequence of attribute/value pairs.
 type Entry struct {
 	Offset   Offset // offset of Entry in DWARF info
 	Tag      Tag    // tag (kind of Entry)
@@ -574,7 +574,7 @@ func (b *buf) entry(cu *Entry, atab abbrevTable, ubase Offset, vers int) *Entry 
 		case formData16:
 			val = b.bytes(16)
 		case formSdata:
-			val = int64(b.int())
+			val = b.int()
 		case formUdata:
 			val = int64(b.uint())
 		case formImplicitConst:
@@ -1172,12 +1172,12 @@ func (d *Data) dwarf5Ranges(u *unit, cu *Entry, base uint64, ranges int64, ret [
 
 		case rleStartxLength:
 			startIdx := buf.uint()
-			len := buf.uint()
+			length := buf.uint()
 			start, err := d.debugAddr(u, uint64(addrBase), startIdx)
 			if err != nil {
 				return nil, err
 			}
-			ret = append(ret, [2]uint64{start, start + len})
+			ret = append(ret, [2]uint64{start, start + length})
 
 		case rleOffsetPair:
 			off1 := buf.uint()
@@ -1194,8 +1194,8 @@ func (d *Data) dwarf5Ranges(u *unit, cu *Entry, base uint64, ranges int64, ret [
 
 		case rleStartLength:
 			start := buf.addr()
-			len := buf.uint()
-			ret = append(ret, [2]uint64{start, start + len})
+			length := buf.uint()
+			ret = append(ret, [2]uint64{start, start + length})
 		}
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -35,7 +34,7 @@ func isStdPackage(pkg string) bool {
 	return false
 }
 
-// pclntab header info
+// PcLnTabMetadata header info
 type PcLnTabMetadata struct {
 	VA            uint64
 	Version       string
@@ -67,7 +66,7 @@ type ExtractMetadata struct {
 	StdFunctions  []FuncMetadata
 }
 
-func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+func mainImpl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
 	extractMetadata := ExtractMetadata{}
 
 	file, err := objfile.Open(fileName)
@@ -105,7 +104,7 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 			extractMetadata.Arch = file.GOARCH()
 		}
 
-		fileData, fileDataErr := ioutil.ReadFile(fileName)
+		fileData, fileDataErr := os.ReadFile(fileName)
 		if fileDataErr == nil {
 
 			// GOVERSION
@@ -138,8 +137,8 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 				needleSrcFileLen := len(needleSrcFile)
 				idx := bytes.Index(fileData, needleSrcFile)
 				if idx != -1 && len(fileData[idx:]) > needleSrcFileLen+20 {
-					os_str := fileData[idx+needleSrcFileLen : idx+needleSrcFileLen+20]
-					for _, c := range os_str {
+					osStr := fileData[idx+needleSrcFileLen : idx+needleSrcFileLen+20]
+					for _, c := range osStr {
 						// end our search at the first '.', which should be the .go soure file extension, or a space as fallback
 						if (c >= 0x30 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) && c != '.' && c != ' ' {
 							extractMetadata.OS += string([]byte{c})
@@ -153,8 +152,8 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 					needleAsmFileLen := len(needleAsmFile)
 					idx := bytes.Index(fileData, needleAsmFile)
 					if idx != -1 && len(fileData[idx:]) > needleAsmFileLen+20 {
-						os_str := fileData[idx+needleAsmFileLen : idx+needleAsmFileLen+20]
-						for _, c := range os_str {
+						osStr := fileData[idx+needleAsmFileLen : idx+needleAsmFileLen+20]
+						for _, c := range osStr {
 							// end our search at the first '_', which should be the _arch, space as fallback
 							if (c >= 0x30 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) && c != '_' && c != '.' && c != ' ' {
 								extractMetadata.OS += string([]byte{c})
@@ -180,7 +179,7 @@ restartParseWithRealTextBase:
 	}
 
 	var moduleData *objfile.ModuleData = nil
-	var finalTab *objfile.PclntabCandidate = &tabs[0]
+	var finalTab = &tabs[0]
 	for _, tab := range tabs {
 		if len(versionOverride) > 0 {
 			extractMetadata.Version = versionOverride
@@ -391,7 +390,12 @@ func TextToJson(key string, text string) string {
 
 func main() {
 	stdout := bufio.NewWriter(os.Stdout)
-	defer stdout.Flush()
+	defer func(stdout *bufio.Writer) {
+		err := stdout.Flush()
+		if err != nil {
+			os.Exit(1)
+		}
+	}(stdout)
 
 	log.SetFlags(0)
 	log.SetPrefix("GoReSym: ")
@@ -409,7 +413,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	metadata, err := main_impl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *typeAddress, *versionOverride)
+	metadata, err := mainImpl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *typeAddress, *versionOverride)
 	if err != nil {
 		fmt.Println(TextToJson("error", fmt.Sprintf("Failed to parse file: %s", err)))
 		os.Exit(1)
@@ -417,7 +421,7 @@ func main() {
 		if *humanView {
 			printForHuman(metadata)
 		} else {
-			fmt.Println(DataToJson((metadata)))
+			fmt.Println(DataToJson(metadata))
 		}
 	}
 }

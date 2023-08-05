@@ -10,12 +10,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/mandiant/GoReSym/debug/elf"
-	"github.com/mandiant/GoReSym/io/fs"
 	"github.com/mandiant/GoReSym/xcoff"
 )
 

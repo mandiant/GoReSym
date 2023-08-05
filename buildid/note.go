@@ -13,9 +13,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-
-	"github.com/mandiant/GoReSym/io/fs"
 )
 
 func readAligned4(r io.Reader, sz int32) ([]byte, error) {

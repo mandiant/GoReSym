@@ -13,17 +13,6 @@ import (
 	"strings"
 )
 
-const (
-	SAIAMAG   = 0x8
-	AIAFMAG   = "`\n"
-	AIAMAG    = "<aiaff>\n"
-	AIAMAGBIG = "<bigaf>\n"
-
-	// Sizeof
-	FL_HSZ_BIG = 0x80
-	AR_HSZ_BIG = 0x70
-)
-
 type bigarFileHeader struct {
 	Flmagic    [SAIAMAG]byte // Archive magic string
 	Flmemoff   [20]byte      // Member table offset
@@ -54,7 +43,7 @@ type Archive struct {
 	closer io.Closer
 }
 
-// MemberHeader holds information about a big archive file header
+// ArchiveHeader holds information about a big archive file header
 type ArchiveHeader struct {
 	magic string
 }
@@ -123,7 +112,7 @@ func NewArchive(r io.ReaderAt) (*Archive, error) {
 	}
 
 	var fhdr bigarFileHeader
-	if _, err := sr.Seek(0, os.SEEK_SET); err != nil {
+	if _, err := sr.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
 	if err := binary.Read(sr, binary.BigEndian, &fhdr); err != nil {
@@ -151,7 +140,7 @@ func NewArchive(r io.ReaderAt) (*Archive, error) {
 		// The member header is normally 2 bytes larger. But it's easier
 		// to read the name if the header is read without _ar_nam.
 		// However, AIAFMAG must be read afterward.
-		if _, err := sr.Seek(off, os.SEEK_SET); err != nil {
+		if _, err := sr.Seek(off, io.SeekStart); err != nil {
 			return nil, err
 		}
 
@@ -183,7 +172,7 @@ func NewArchive(r io.ReaderAt) (*Archive, error) {
 		fileoff := off + AR_HSZ_BIG + namlen
 		if fileoff&1 != 0 {
 			fileoff++
-			if _, err := sr.Seek(1, os.SEEK_CUR); err != nil {
+			if _, err := sr.Seek(1, io.SeekCurrent); err != nil {
 				return nil, err
 			}
 		}
@@ -207,22 +196,19 @@ func NewArchive(r io.ReaderAt) (*Archive, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error parsing offset of first member in archive header(%q); %v", fhdr, err)
 		}
-
 	}
 
 	return arch, nil
-
 }
 
 // GetFile returns the XCOFF file defined by member name.
 // FIXME: This doesn't work if an archive has two members with the same
 // name which can occur if a archive has both 32-bits and 64-bits files.
-func (arch *Archive) GetFile(name string) (*File, error) {
-	for _, mem := range arch.Members {
+func (a *Archive) GetFile(name string) (*File, error) {
+	for _, mem := range a.Members {
 		if mem.Name == name {
 			return NewFile(mem.sr)
 		}
 	}
 	return nil, fmt.Errorf("unknown member %s in archive", name)
-
 }

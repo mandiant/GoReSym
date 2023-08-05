@@ -1,4 +1,4 @@
-/*Copyright (C) 2022 Mandiant, Inc. All Rights Reserved.*/ 
+/*Copyright (C) 2022 Mandiant, Inc. All Rights Reserved.*/
 package main
 
 import (
@@ -29,7 +29,7 @@ func TestAllVersions(t *testing.T) {
 			}
 
 			t.Run(versionPath, func(t *testing.T) {
-				data, err := main_impl(filePath, true, true, true, 0, "")
+				data, err := mainImpl(filePath, true, true, true, 0, "")
 				if err != nil {
 					t.Errorf("Go %s failed on %s: %s", v, file, err)
 				}

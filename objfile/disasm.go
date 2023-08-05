@@ -13,7 +13,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -160,7 +159,7 @@ func (fc *FileCache) Line(filename string, line int) ([]byte, error) {
 	}
 
 	if e == nil {
-		content, err := ioutil.ReadFile(filename)
+		content, err := os.ReadFile(filename)
 		if err != nil {
 			return nil, err
 		}
@@ -296,15 +295,15 @@ func (d *Disasm) Decode(start, end uint64, relocs []Reloc, gnuAsm bool, f func(p
 type lookupFunc = func(addr uint64) (sym string, base uint64)
 type disasmFunc func(code []byte, pc uint64, lookup lookupFunc, ord binary.ByteOrder, _ bool) (text string, size int)
 
-func disasm_386(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
-	return disasm_x86(code, pc, lookup, 32, gnuAsm)
+func disasm386(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
+	return disasmX86(code, pc, lookup, 32, gnuAsm)
 }
 
-func disasm_amd64(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
-	return disasm_x86(code, pc, lookup, 64, gnuAsm)
+func disasmAmd64(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
+	return disasmX86(code, pc, lookup, 64, gnuAsm)
 }
 
-func disasm_x86(code []byte, pc uint64, lookup lookupFunc, arch int, gnuAsm bool) (string, int) {
+func disasmX86(code []byte, pc uint64, lookup lookupFunc, arch int, gnuAsm bool) (string, int) {
 	inst, err := x86asm.Decode(code, arch)
 	var text string
 	size := inst.Len
@@ -341,7 +340,7 @@ func (r textReader) ReadAt(data []byte, off int64) (n int, err error) {
 	return
 }
 
-func disasm_arm(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
+func disasmArm(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, gnuAsm bool) (string, int) {
 	inst, err := armasm.Decode(code, armasm.ModeARM)
 	var text string
 	size := inst.Len
@@ -356,7 +355,7 @@ func disasm_arm(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder, g
 	return text, size
 }
 
-func disasm_arm64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.ByteOrder, gnuAsm bool) (string, int) {
+func disasmArm64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.ByteOrder, gnuAsm bool) (string, int) {
 	inst, err := arm64asm.Decode(code)
 	var text string
 	if err != nil || inst.Op == 0 {
@@ -369,7 +368,7 @@ func disasm_arm64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.By
 	return text, 4
 }
 
-func disasm_ppc64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.ByteOrder, gnuAsm bool) (string, int) {
+func disasmPpc64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.ByteOrder, gnuAsm bool) (string, int) {
 	inst, err := ppc64asm.Decode(code, byteOrder)
 	var text string
 	size := inst.Len
@@ -387,12 +386,12 @@ func disasm_ppc64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.By
 }
 
 var disasms = map[string]disasmFunc{
-	"386":     disasm_386,
-	"amd64":   disasm_amd64,
-	"arm":     disasm_arm,
-	"arm64":   disasm_arm64,
-	"ppc64":   disasm_ppc64,
-	"ppc64le": disasm_ppc64,
+	"386":     disasm386,
+	"amd64":   disasmAmd64,
+	"arm":     disasmArm,
+	"arm64":   disasmArm64,
+	"ppc64":   disasmPpc64,
+	"ppc64le": disasmPpc64,
 }
 
 var byteOrders = map[string]binary.ByteOrder{
@@ -406,7 +405,7 @@ var byteOrders = map[string]binary.ByteOrder{
 }
 
 type Liner interface {
-	// Given a pc, returns the corresponding file, line, and function data.
+	// PCToLine Given a pc, returns the corresponding file, line, and function data.
 	// If unknown, returns "",0,nil.
 	PCToLine(uint64) (string, int, *gosym.Func)
 }

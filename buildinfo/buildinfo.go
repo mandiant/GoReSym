@@ -265,7 +265,7 @@ func (x *elfExe) DataStart() uint64 {
 	}
 
 	for _, p := range x.f.Progs {
-		flags := elf.ProgFlag(elf.PF_R | elf.PF_W)
+		flags := elf.PF_R | elf.PF_W
 		if p.Type == elf.PT_LOAD && (p.Flags&flags) == flags {
 			return p.Vaddr
 		}

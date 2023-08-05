@@ -271,15 +271,16 @@ func (p *ImportedPkg) Write(w *Writer) {
 // Symbol definition.
 //
 // Serialized format:
-// Sym struct {
-//    Name  string
-//    ABI   uint16
-//    Type  uint8
-//    Flag  uint8
-//    Flag2 uint8
-//    Siz   uint32
-//    Align uint32
-// }
+//
+//	Sym struct {
+//	   Name  string
+//	   ABI   uint16
+//	   Type  uint8
+//	   Flag  uint8
+//	   Flag2 uint8
+//	   Siz   uint32
+//	   Align uint32
+//	}
 type Sym [SymSize]byte
 
 const SymSize = stringRefSize + 2 + 1 + 1 + 1 + 4 + 4
@@ -316,9 +317,9 @@ func (s *Sym) NameLen(r *Reader) int {
 }
 
 func (s *Sym) Name(r *Reader) string {
-	len := binary.LittleEndian.Uint32(s[:])
+	length := binary.LittleEndian.Uint32(s[:])
 	off := binary.LittleEndian.Uint32(s[4:])
-	return r.StringAt(off, len)
+	return r.StringAt(off, length)
 }
 
 func (s *Sym) ABI() uint16   { return binary.LittleEndian.Uint16(s[8:]) }
@@ -375,13 +376,14 @@ const HashSize = sha1.Size
 // Relocation.
 //
 // Serialized format:
-// Reloc struct {
-//    Off  int32
-//    Siz  uint8
-//    Type uint8
-//    Add  int64
-//    Sym  SymRef
-// }
+//
+//	Reloc struct {
+//	   Off  int32
+//	   Siz  uint8
+//	   Type uint8
+//	   Add  int64
+//	   Sym  SymRef
+//	}
 type Reloc [RelocSize]byte
 
 const RelocSize = 4 + 1 + 1 + 8 + 8
@@ -419,10 +421,11 @@ func (r *Reloc) fromBytes(b []byte) { copy(r[:], b) }
 // Aux symbol info.
 //
 // Serialized format:
-// Aux struct {
-//    Type uint8
-//    Sym  SymRef
-// }
+//
+//	Aux struct {
+//	   Type uint8
+//	   Sym  SymRef
+//	}
 type Aux [AuxSize]byte
 
 const AuxSize = 1 + 8
@@ -462,11 +465,12 @@ func (a *Aux) fromBytes(b []byte) { copy(a[:], b) }
 // Referenced symbol flags.
 //
 // Serialized format:
-// RefFlags struct {
-//    Sym   symRef
-//    Flag  uint8
-//    Flag2 uint8
-// }
+//
+//	RefFlags struct {
+//	   Sym   symRef
+//	   Flag  uint8
+//	   Flag2 uint8
+//	}
 type RefFlags [RefFlagsSize]byte
 
 const RefFlagsSize = 8 + 1 + 1
@@ -489,10 +493,11 @@ func (r *RefFlags) Write(w *Writer) { w.Bytes(r[:]) }
 // Referenced symbol name.
 //
 // Serialized format:
-// RefName struct {
-//    Sym  symRef
-//    Name string
-// }
+//
+//	RefName struct {
+//	   Sym  symRef
+//	   Name string
+//	}
 type RefName [RefNameSize]byte
 
 const RefNameSize = 8 + stringRefSize
@@ -501,9 +506,9 @@ func (n *RefName) Sym() SymRef {
 	return SymRef{binary.LittleEndian.Uint32(n[:]), binary.LittleEndian.Uint32(n[4:])}
 }
 func (n *RefName) Name(r *Reader) string {
-	len := binary.LittleEndian.Uint32(n[8:])
+	length := binary.LittleEndian.Uint32(n[8:])
 	off := binary.LittleEndian.Uint32(n[12:])
-	return r.StringAt(off, len)
+	return r.StringAt(off, length)
 }
 
 func (n *RefName) SetSym(x SymRef) {
@@ -735,7 +740,7 @@ func (r *Reader) NNonpkgref() int {
 
 // SymOff returns the offset of the i-th symbol.
 func (r *Reader) SymOff(i uint32) uint32 {
-	return r.h.Offsets[BlkSymdef] + uint32(i*SymSize)
+	return r.h.Offsets[BlkSymdef] + (i * SymSize)
 }
 
 // Sym returns a pointer to the i-th symbol.
@@ -760,7 +765,7 @@ func (r *Reader) RefFlags(i int) *RefFlags {
 // Note: here i is the index of short hashed symbols, not all symbols
 // (unlike other accessors).
 func (r *Reader) Hash64(i uint32) uint64 {
-	off := r.h.Offsets[BlkHash64] + uint32(i*Hash64Size)
+	off := r.h.Offsets[BlkHash64] + (i * Hash64Size)
 	return r.uint64At(off)
 }
 
@@ -768,19 +773,19 @@ func (r *Reader) Hash64(i uint32) uint64 {
 // Note: here i is the index of hashed symbols, not all symbols
 // (unlike other accessors).
 func (r *Reader) Hash(i uint32) *HashType {
-	off := r.h.Offsets[BlkHash] + uint32(i*HashSize)
+	off := r.h.Offsets[BlkHash] + (i * HashSize)
 	return (*HashType)(unsafe.Pointer(&r.b[off]))
 }
 
 // NReloc returns the number of relocations of the i-th symbol.
 func (r *Reader) NReloc(i uint32) int {
-	relocIdxOff := r.h.Offsets[BlkRelocIdx] + uint32(i*4)
+	relocIdxOff := r.h.Offsets[BlkRelocIdx] + i*4
 	return int(r.uint32At(relocIdxOff+4) - r.uint32At(relocIdxOff))
 }
 
 // RelocOff returns the offset of the j-th relocation of the i-th symbol.
 func (r *Reader) RelocOff(i uint32, j int) uint32 {
-	relocIdxOff := r.h.Offsets[BlkRelocIdx] + uint32(i*4)
+	relocIdxOff := r.h.Offsets[BlkRelocIdx] + i*4
 	relocIdx := r.uint32At(relocIdxOff)
 	return r.h.Offsets[BlkReloc] + (relocIdx+uint32(j))*uint32(RelocSize)
 }
