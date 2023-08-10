@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -105,7 +104,7 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 			extractMetadata.Arch = file.GOARCH()
 		}
 
-		fileData, fileDataErr := ioutil.ReadFile(fileName)
+		fileData, fileDataErr := os.ReadFile(fileName)
 		if fileDataErr == nil {
 
 			// GOVERSION
