@@ -225,10 +225,23 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 }
 
 func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
+	data_len := len(data)
 	matches := make([]int, 0)
 	needleMatches := findAllOccurrences(data, [][]byte{regexInfo.needle})
 	for _, needleMatch := range needleMatches {
-		for _, reMatch := range regexInfo.re.FindAllIndex(data[needleMatch-regexInfo.len:needleMatch+regexInfo.len], -1) {
+		data_start := needleMatch - regexInfo.len
+		data_end := needleMatch + regexInfo.len
+		if data_start >= data_len {
+			continue
+		} else if data_start <= 0 {
+			data_start = 0
+		}
+
+		if data_end >= data_len {
+			data_end = data_len - 1
+		}
+
+		for _, reMatch := range regexInfo.re.FindAllIndex(data[data_start:data_end], -1) {
 			start := reMatch[0]
 			//end := reMatch[1]
 			matches = append(matches, start)
