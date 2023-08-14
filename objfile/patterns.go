@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	"rsc.io/binaryregexp"
 )
 
@@ -42,14 +43,14 @@ func isHex(s string) bool {
 // although this requires more code, we provide this functionality
 // because these patterns are *much* more readable than raw regular expressions,
 // we strongly value people being able to understand GoReSym's algorithm.
-func RegexpPatternFromYaraPattern(pattern string) (string, error) {
+func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 
 	if !strings.HasPrefix(pattern, "{") {
-		return "", errors.New("missing prefix")
+		return nil, errors.New("missing prefix")
 	}
 
 	if !strings.HasSuffix(pattern, "}") {
-		return "", errors.New("missing suffix")
+		return nil, errors.New("missing suffix")
 	}
 
 	pattern = strings.Trim(pattern, "{}")
@@ -57,6 +58,10 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 	pattern = strings.ReplaceAll(pattern, " ", "")
 
 	pattern = strings.ToLower(pattern)
+
+	patLen := 0
+	needle := make([]byte, 0)
+	tmpNeedle := make([]byte, 0)
 
 	var regex_pattern string
 	for i := 0; i < len(pattern); {
@@ -71,12 +76,19 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 		// output: .
 		if c == "?" {
 			if d != "?" {
-				return "", errors.New("cannot mask the first nibble")
+				return nil, errors.New("cannot mask the first nibble")
 			}
 
 			regex_pattern += "."
 
 			i += 2
+			patLen += 1
+			if len(tmpNeedle) > len(needle) {
+				needle = slices.Clone(tmpNeedle)
+				tmpNeedle = make([]byte, 0)
+			} else {
+				tmpNeedle = make([]byte, 0)
+			}
 			continue
 		}
 
@@ -85,23 +97,23 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 		if c == "[" {
 			end := strings.Index(pattern[i:], "]")
 			if end == -1 {
-				return "", errors.New("unbalanced [")
+				return nil, errors.New("unbalanced [")
 			}
 
 			chunk := pattern[i+1 : i+end]
 			low, high, found := strings.Cut(chunk, "-")
 			if !found {
-				return "", errors.New("[] didn't contain a dash")
+				return nil, errors.New("[] didn't contain a dash")
 			}
 
 			_, err := strconv.Atoi(low)
 			if err != nil {
-				return "", errors.New("invalid number")
+				return nil, errors.New("invalid number")
 			}
 
 			_, err = strconv.Atoi(high)
 			if err != nil {
-				return "", errors.New("invalid number")
+				return nil, errors.New("invalid number")
 			}
 
 			regex_pattern += "."
@@ -112,6 +124,14 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 			regex_pattern += "}"
 
 			i += end + 1
+			patLen += 1
+
+			if len(tmpNeedle) > len(needle) {
+				needle = slices.Clone(tmpNeedle)
+				tmpNeedle = make([]byte, 0)
+			} else {
+				tmpNeedle = make([]byte, 0)
+			}
 			continue
 		}
 
@@ -120,7 +140,7 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 		if c == "(" {
 			end := strings.Index(pattern[i:], ")")
 			if end == -1 {
-				return "", errors.New("unbalanced (")
+				return nil, errors.New("unbalanced (")
 			}
 
 			chunk := pattern[i+1 : i+end]
@@ -129,7 +149,7 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 			regex_pattern += "("
 			for j, choice := range choices {
 				if !isHex(choice) {
-					return "", errors.New("choice not hex")
+					return nil, errors.New("choice not hex")
 				}
 
 				if j != 0 {
@@ -141,6 +161,13 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 			regex_pattern += ")"
 
 			i += end + 1
+			patLen += len(choices)
+			if len(tmpNeedle) > len(needle) {
+				needle = slices.Clone(tmpNeedle)
+				tmpNeedle = make([]byte, 0)
+			} else {
+				tmpNeedle = make([]byte, 0)
+			}
 			continue
 		}
 
@@ -148,7 +175,7 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 		// output: [\x00-\x0F]
 		if d == "?" {
 			if !isHex(c) {
-				return "", errors.New("not hex digit")
+				return nil, errors.New("not hex digit")
 			}
 
 			regex_pattern += "["
@@ -158,6 +185,13 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 			regex_pattern += "]"
 
 			i += 2
+			patLen += 1
+			if len(tmpNeedle) > len(needle) {
+				needle = slices.Clone(tmpNeedle)
+				tmpNeedle = make([]byte, 0)
+			} else {
+				tmpNeedle = make([]byte, 0)
+			}
 			continue
 		}
 
@@ -165,117 +199,47 @@ func RegexpPatternFromYaraPattern(pattern string) (string, error) {
 		// output: \xAB
 		if isHex(c) && isHex(d) {
 			regex_pattern += `\x` + strings.ToUpper(c+d)
-
+			byt, err := strconv.ParseInt(c+d, 16, 64)
+			if err != nil {
+				return nil, errors.New("not hex digit")
+			}
+			tmpNeedle = append(tmpNeedle, byte(byt))
 			i += 2
+			patLen += 1
 			continue
 		}
 
-		return "", errors.New("unexpected value")
+		return nil, errors.New("unexpected value")
 	}
 
-	return regex_pattern, nil
-}
-
-func RegexpFromYaraPattern(pattern string) (*binaryregexp.Regexp, error) {
-	regex_pattern, e := RegexpPatternFromYaraPattern(pattern)
-	if e != nil {
-		return nil, e
+	if len(tmpNeedle) > len(needle) {
+		needle = slices.Clone(tmpNeedle)
+		//tmpNeedle = make([]byte, 0) not needed at exit
 	}
 
 	r := binaryregexp.MustCompile(regex_pattern)
 	if r == nil {
 		return nil, errors.New("failed to compile regex")
 	}
-
-	return r, nil
+	return &RegexAndNeedle{patLen, regex_pattern, r, needle}, nil
 }
 
-type BinaryRegexpGroup struct {
-	patterns map[string]string
-
-	re *binaryregexp.Regexp
-}
-
-func NewBinaryRegexpGroup(patterns map[string]string) (*BinaryRegexpGroup, error) {
-
-	var pattern string
-
-	i := 0
-	pattern += "("
-	for k, v := range patterns {
-		if i != 0 {
-			pattern += "|"
-		}
-		i += 1
-
-		pattern += "(?P"
-		pattern += "<" + k + ">"
-		pattern += v
-		pattern += ")"
-	}
-	pattern += ")"
-
-	re := binaryregexp.MustCompile(pattern)
-	if re == nil {
-		return nil, errors.New("failed to compile regex")
-	}
-
-	return &BinaryRegexpGroup{
-		patterns: patterns,
-		re:       re,
-	}, nil
-}
-
-type BinaryRegexGroupMatches struct {
-	g       *BinaryRegexpGroup
-	matches [][]int
-}
-
-func (g *BinaryRegexpGroup) FindAllIndex(buf []byte, n int) *BinaryRegexGroupMatches {
-	matches := g.re.FindAllIndex(buf, n)
-
-	return &BinaryRegexGroupMatches{
-		g:       g,
-		matches: matches,
-	}
-}
-
-// fetch the index of the subexp for the given regexp.
-//
-// this is called `(*Regexp) SubexpIndex` in recent Go,
-// but doesn't seem to be implemented in binaryregexp.
-// https://pkg.go.dev/regexp#Regexp.SubexpIndex
-func SubexpIndex(re *binaryregexp.Regexp, name string) int {
-	for i, n := range re.SubexpNames() {
-		if n == name {
-			return i
+func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
+	matches := make([]int, 0)
+	needleMatches := findAllOccurrences(data, [][]byte{regexInfo.needle})
+	for _, needleMatch := range needleMatches {
+		for _, reMatch := range regexInfo.re.FindAllIndex(data[needleMatch-regexInfo.len:needleMatch+regexInfo.len], -1) {
+			start := reMatch[0]
+			//end := reMatch[1]
+			matches = append(matches, start)
 		}
 	}
-
-	return -1
+	return matches
 }
 
-// fetch the [start, end] pairs for the subexp with the given name in the given matches.
-func SubexpIndexMatches(re *binaryregexp.Regexp, matches [][]int, name string) [][]int {
-	index := SubexpIndex(re, name)
-
-	var ret [][]int
-	for _, match := range matches {
-
-		start := match[2*index]
-		end := match[2*index+1]
-
-		if start == -1 && end == -1 {
-			continue
-		}
-
-		ret = append(ret, []int{start, end})
-	}
-
-	return ret
-}
-
-// fetch the [start, end] pairs for the subexp with the given name.
-func (m *BinaryRegexGroupMatches) MatchesForSubexp(name string) [][]int {
-	return SubexpIndexMatches(m.g.re, m.matches, name)
+type RegexAndNeedle struct {
+	len    int
+	rawre  string
+	re     *binaryregexp.Regexp
+	needle []byte // longest fixed sub-sequence of regex
 }

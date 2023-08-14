@@ -1,8 +1,6 @@
 package objfile
 
-import (
-	"encoding/binary"
-)
+import "encoding/binary"
 
 type signatureModuleDataInitx64 struct {
 	moduleDataPtrLoc       uint64 // offset in signature to the location of the pointer to the PCHeader
@@ -81,22 +79,13 @@ var ARM32_sig = signatureModuleDataInitARM32{0, `{ ?? ?? 9F E5 ?? ?? ?? EA ?? ??
 func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 	var matches []SignatureMatch = make([]SignatureMatch, 0)
 
-	g, e := NewBinaryRegexpGroup(map[string]string{
-		"x64":    x64sig.signature,
-		"x86":    x86sig.signature,
-		"ARM64":  ARM64_sig.signature,
-		"ARM32":  ARM32_sig.signature,
-		"PPC_BE": PPC_BE_sig.signature,
-	})
-	if e != nil {
-		// programmer error: check the patterns
-		panic(e)
+	x64reg, err := RegexpPatternFromYaraPattern(x64sig.signature)
+	if err != nil {
+		panic(err)
 	}
 
-	m := g.FindAllIndex(data, -1)
-
-	for _, match := range m.MatchesForSubexp("x64") {
-		sigPtr := uint64(match[0]) // from int
+	for _, match := range FindRegex(data, x64reg) {
+		sigPtr := uint64(match) // from int
 
 		// this is the pointer offset stored in the instruction
 		// 0x44E06A:       48 8D 0D 4F F0 24 00 lea     rcx, off_69D0C0 (result: 0x24f04f)
@@ -110,8 +99,13 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		})
 	}
 
-	for _, match := range m.MatchesForSubexp("x86") {
-		sigPtr := uint64(match[0]) // from int
+	x86reg, err := RegexpPatternFromYaraPattern(x86sig.signature)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, match := range FindRegex(data, x86reg) {
+		sigPtr := uint64(match) // from int
 
 		moduleDataPtr := uint64(binary.LittleEndian.Uint32(data[sigPtr+x86sig.moduleDataPtrLoc:][:4]))
 		matches = append(matches, SignatureMatch{
@@ -119,8 +113,13 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		})
 	}
 
-	for _, match := range m.MatchesForSubexp("ARM64") {
-		sigPtr := uint64(match[0]) // from int
+	arm64reg, err := RegexpPatternFromYaraPattern(ARM64_sig.signature)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, match := range FindRegex(data, arm64reg) {
+		sigPtr := uint64(match) // from int
 
 		adrp := binary.LittleEndian.Uint32(data[sigPtr+ARM64_sig.moduleDataPtrADRP:][:4])
 		add := binary.LittleEndian.Uint32(data[sigPtr+ARM64_sig.moduleDataPtrADD:][:4])
@@ -140,28 +139,32 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		})
 	}
 
-	for _, match := range m.MatchesForSubexp("ARM32") {
-		sigPtr := uint64(match[0]) // from int
+	arm32reg, err := RegexpPatternFromYaraPattern(ARM32_sig.signature)
+	if err != nil {
+		panic(err)
+	}
 
+	for _, match := range FindRegex(data, arm32reg) {
+		sigPtr := uint64(match) // from int
 		ldr := binary.LittleEndian.Uint32(data[sigPtr+ARM32_sig.moduleDataPtrLDR:][:4])
-
 		// ARM PC relative is always +8 due to legacy nonsense
 		ldr_pointer_stub := uint64((ldr & 0x00000FFF) + 8)
 		final := uint64(binary.LittleEndian.Uint32(data[sigPtr+ARM32_sig.moduleDataPtrLDR+ldr_pointer_stub:][:4]))
-
 		matches = append(matches, SignatureMatch{
 			final,
 		})
 	}
 
-	for _, match := range m.MatchesForSubexp("PPC_BE") {
-		sigPtr := uint64(match[0]) // from int
+	ppcBEreg, err := RegexpPatternFromYaraPattern(PPC_BE_sig.signature)
+	if err != nil {
+		panic(err)
+	}
 
+	for _, match := range FindRegex(data, ppcBEreg) {
+		sigPtr := uint64(match) // from int
 		moduleDataPtrHi := int64(binary.BigEndian.Uint16(data[sigPtr+PPC_BE_sig.moduleDataPtrHi:][:2]))
-
 		// addi takes a signed immediate
 		moduleDataPtrLo := int64(int16(binary.BigEndian.Uint16(data[sigPtr+PPC_BE_sig.moduleDataPtrLo:][:2])))
-
 		moduleDataIpOffset := uint64((moduleDataPtrHi << 16) + moduleDataPtrLo)
 		matches = append(matches, SignatureMatch{
 			moduleDataIpOffset,

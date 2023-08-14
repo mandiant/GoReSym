@@ -1,7 +1,7 @@
 package objfile
 
 import (
-	"fmt"
+	"bytes"
 	"testing"
 
 	"rsc.io/binaryregexp"
@@ -104,53 +104,6 @@ func TestRegexGrouping(t *testing.T) {
 			t.Errorf("5")
 		}
 	})
-
-	t.Run("two groups", func(t *testing.T) {
-		re := binaryregexp.MustCompile(`((?P<xxx>a(x*)b)|(?P<yyy>c(y*)d))`)
-
-		fmt.Printf("aa: %v\n", re)
-		fmt.Printf("%q\n", re.SubexpNames())
-
-		if SubexpIndex(re, "xxx") != 2 {
-			t.Errorf("xxx index")
-		}
-
-		if SubexpIndex(re, "yyy") != 4 {
-			t.Errorf("yyy index")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--ab--", -1), "xxx"), [][]int{{2, 4}}) {
-			t.Errorf("1")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--axxb--", -1), "xxx"), [][]int{{2, 6}}) {
-			t.Errorf("2")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--ab--", -1), "yyy"), [][]int{}) {
-			t.Errorf("3: no matches")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--cd--", -1), "xxx"), [][]int{}) {
-			t.Errorf("4: no matches")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--cd--", -1), "yyy"), [][]int{{2, 4}}) {
-			t.Errorf("5")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--cyyd--", -1), "yyy"), [][]int{{2, 6}}) {
-			t.Errorf("6")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--abcd--", -1), "xxx"), [][]int{{2, 4}}) {
-			t.Errorf("7")
-		}
-
-		if !compare(SubexpIndexMatches(re, re.FindAllStringSubmatchIndex("--abcd--", -1), "yyy"), [][]int{{4, 6}}) {
-			t.Errorf("8")
-		}
-	})
 }
 
 func TestRegexpPatternFromYaraPattern(t *testing.T) {
@@ -159,51 +112,63 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 			t.Errorf("empty pattern should have errored")
 		}
 
-		p, err := RegexpPatternFromYaraPattern("{}")
+		reg, err := RegexpPatternFromYaraPattern("{}")
 		if err != nil {
 			t.Errorf("empty pattern errored")
 		}
-		if p != "" {
+		if reg.rawre != "" {
 			t.Errorf("incorrect empty pattern")
 		}
 	})
 
 	t.Run("x64firstmoduledata", func(t *testing.T) {
-		p, err := RegexpPatternFromYaraPattern("{ 48 8D 0? ?? ?? ?? ?? EB ?? 48 8? 8? ?? 02 00 00 66 0F 1F 44 00 00 }")
+		reg, err := RegexpPatternFromYaraPattern("{ 48 8D 0? ?? ?? ?? ?? EB ?? 48 8? 8? ?? 02 00 00 66 0F 1F 44 00 00 }")
 
 		if err != nil {
 			t.Errorf("pattern errored")
 		}
 
 		// manually translated
-		if p != `\x48\x8D[\x00-\x0F]....\xEB.\x48[\x80-\x8F][\x80-\x8F].\x02\x00\x00\x66\x0F\x1F\x44\x00\x00` {
+		if reg.rawre != `\x48\x8D[\x00-\x0F]....\xEB.\x48[\x80-\x8F][\x80-\x8F].\x02\x00\x00\x66\x0F\x1F\x44\x00\x00` {
 			t.Errorf("incorrect pattern")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{02, 00, 00, 0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00}) {
+			t.Errorf("incorrect needle")
 		}
 	})
 
 	t.Run("x86sig", func(t *testing.T) {
-		p, err := RegexpPatternFromYaraPattern("{ 8D ?? ?? ?? ?? ?? EB ?? [0-50] 8B ?? ?? 01 00 00 8B ?? ?? ?? 85 ?? 75 ?? }")
+		reg, err := RegexpPatternFromYaraPattern("{ 8D ?? ?? ?? ?? ?? EB ?? [0-50] 8B ?? ?? 01 00 00 8B ?? ?? ?? 85 ?? 75 ?? }")
 
 		if err != nil {
 			t.Errorf("pattern errored")
 		}
 
 		// manually translated
-		if p != `\x8D.....\xEB..{0,50}\x8B..\x01\x00\x00\x8B...\x85.\x75.` {
+		if reg.rawre != `\x8D.....\xEB..{0,50}\x8B..\x01\x00\x00\x8B...\x85.\x75.` {
 			t.Errorf("incorrect pattern")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{0x01, 0x00, 0x00, 0x8B}) {
+			t.Errorf("incorrect needle")
 		}
 	})
 
 	t.Run("arm64", func(t *testing.T) {
-		p, err := RegexpPatternFromYaraPattern("{ ?? ?? ?? (90 | b0 | f0 | d0) ?? ?? ?? 91 ?? ?? ?? (14 | 17) ?? ?? 41 F9 ?? ?? ?? B4 }")
+		reg, err := RegexpPatternFromYaraPattern("{ ?? ?? ?? (90 | b0 | f0 | d0) ?? ?? ?? 91 ?? ?? ?? (14 | 17) ?? ?? 41 F9 ?? ?? ?? B4 }")
 
 		if err != nil {
 			t.Errorf("pattern errored")
 		}
 
 		// manually translated
-		if p != `...(\x90|\xB0|\xF0|\xD0)...\x91...(\x14|\x17)..\x41\xF9...\xB4` {
+		if reg.rawre != `...(\x90|\xB0|\xF0|\xD0)...\x91...(\x14|\x17)..\x41\xF9...\xB4` {
 			t.Errorf("incorrect pattern")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{0x41, 0xF9}) {
+			t.Errorf("incorrect needle")
 		}
 	})
 }
