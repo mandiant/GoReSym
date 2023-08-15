@@ -144,7 +144,7 @@ func TestWeirdBins(t *testing.T) {
 	})
 
 	t.Run("fmtisfun_macho", func(t *testing.T) {
-		testSymbolRecovery(t, "fmtisfun_macho", 0x10be128, 0x1109260, 0x10879b0)
+		testSymbolRecovery(t, "fmtisfun_macho", 0x10be140, 0x1109260, 0x10879b0)
 	})
 
 	t.Run("fmtisfun_win", func(t *testing.T) {

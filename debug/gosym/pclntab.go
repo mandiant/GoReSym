@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -352,8 +351,9 @@ func (t *LineTable) go12Funcs() []Func {
 	}
 
 	// avoid OOM error on corrupt binaries
+	// empirically gathered. Most binaries are <= UINT16_MAX, but some truly huge have >= 100000 functions
 	ft := t.funcTab()
-	if ft.Count() >= math.MaxUint16 {
+	if ft.Count() >= 350000 {
 		return make([]Func, 1)
 	}
 
