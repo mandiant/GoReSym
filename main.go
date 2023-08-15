@@ -167,9 +167,10 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 		}
 	}
 
+	var knownPclntabVA = uint64(0)
 	var knownGoTextBase = uint64(0)
 restartParseWithRealTextBase:
-	tabs, err := file.PCLineTable(versionOverride, knownGoTextBase)
+	tabs, err := file.PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
 	}
@@ -223,10 +224,10 @@ restartParseWithRealTextBase:
 				stomppedMagicMetaConstraintsValid = tab.StompMagicCandidateMeta.SuspectedModuleDataVa == tmpModData.VA
 			}
 
-			if knownGoTextBase == 0 && stomppedMagicMetaConstraintsValid {
+			if knownGoTextBase == 0 && knownPclntabVA == 0 && stomppedMagicMetaConstraintsValid {
 				// assign real base and restart pclntab parsing with correct VAs!
-				// TODO: optimize, we should only restart pclntab parsing of the candidates we know find a moduledata
 				knownGoTextBase = tmpModData.TextVA
+				knownPclntabVA = tab.PclntabVA
 				goto restartParseWithRealTextBase
 			}
 
