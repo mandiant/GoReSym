@@ -319,80 +319,49 @@ func (f *machoFile) pcln() (candidates []PclntabCandidate, err error) {
 }
 
 func (f *machoFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (secStart uint64, moduledataVA uint64, moduledata []byte, err error) {
-	foundsym := false
-	foundsec := false
-	foundmodule := false
-
-	syms, err := f.symbols()
-	if err == nil {
-		foundsym = false
-		for _, sym := range syms {
-			// TODO: handle legacy symbols ??
-			if sym.Name == "runtime.firstmoduledata" {
-				moduledataVA = sym.Addr
-				foundsym = true // annoyingly the elf symbols dont give section #, so we delay getting data to later, unlike in pe
-				break
-			}
-		}
-	}
+	found := false
 
 scan:
 	for _, sec := range f.macho.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
 		data := f.macho.DataAfterSection(sec)
-		if !foundsym {
-			// fall back to scanning for structure using address of pclntab, which is first value in struc
-			var pclntabVA_bytes []byte
-			if is64bit {
-				pclntabVA_bytes = make([]byte, 8)
-				if littleendian {
-					binary.LittleEndian.PutUint64(pclntabVA_bytes, pclntabVA)
-				} else {
-					binary.BigEndian.PutUint64(pclntabVA_bytes, pclntabVA)
-				}
+		// fall back to scanning for structure using address of pclntab, which is first value in struc
+		var pclntabVA_bytes []byte
+		if is64bit {
+			pclntabVA_bytes = make([]byte, 8)
+			if littleendian {
+				binary.LittleEndian.PutUint64(pclntabVA_bytes, pclntabVA)
 			} else {
-				pclntabVA_bytes = make([]byte, 4)
-				if littleendian {
-					binary.LittleEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
-				} else {
-					binary.BigEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
-				}
-			}
-
-			moduledata_idx := bytes.Index(data, pclntabVA_bytes)
-			if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
-				moduledata = data[moduledata_idx:]
-				moduledataVA = sec.Addr + uint64(moduledata_idx)
-				secStart = sec.Addr
-
-				// optionally consult ignore list, to skip past previous (bad) scan results
-				for _, ignore := range ignorelist {
-					if ignore == moduledataVA {
-						continue scan
-					}
-				}
-
-				foundsec = true
-				foundmodule = true
-				break
+				binary.BigEndian.PutUint64(pclntabVA_bytes, pclntabVA)
 			}
 		} else {
-			if moduledataVA > sec.Addr && moduledataVA < sec.Addr+sec.Size {
-				sectionoffset := moduledataVA - sec.Addr
-				moduledata = data[sectionoffset:]
-				secStart = sec.Addr
-				foundsec = true
-				foundmodule = true
-				break
+			pclntabVA_bytes = make([]byte, 4)
+			if littleendian {
+				binary.LittleEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
+			} else {
+				binary.BigEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
 			}
+		}
+
+		moduledata_idx := bytes.Index(data, pclntabVA_bytes)
+		if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
+			moduledata = data[moduledata_idx:]
+			moduledataVA = sec.Addr + uint64(moduledata_idx)
+			secStart = sec.Addr
+
+			// optionally consult ignore list, to skip past previous (bad) scan results
+			for _, ignore := range ignorelist {
+				if ignore == moduledataVA {
+					continue scan
+				}
+			}
+
+			found = true
+			break
 		}
 	}
 
-	if !foundmodule {
-		return 0, 0, nil, fmt.Errorf("moduledata could not be located")
-	}
-
-	if !foundsec {
+	if !found {
 		return 0, 0, nil, fmt.Errorf("moduledata containing section could not be located")
 	}
 
