@@ -31,7 +31,8 @@ type File struct {
 	COFFSymbols    []COFFSymbol // all COFF symbols (including auxiliary symbol records)
 	StringTable    StringTable
 
-	closer io.Closer
+	closer                io.Closer
+	dataAfterSectionCache map[uint64][]byte // secVA -> dataAfterSection
 }
 
 // Open opens the named file using os.Open and prepares it for use as a PE binary.
@@ -172,6 +173,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		}
 	}
 
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 
@@ -212,6 +214,10 @@ func (f *File) Section(name string) *Section {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
+	if cached, ok := f.dataAfterSectionCache[uint64(target.VirtualAddress)]; ok {
+		return cached
+	}
+
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
@@ -230,6 +236,7 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
+	f.dataAfterSectionCache[uint64(target.VirtualAddress)] = data
 	return data
 }
 

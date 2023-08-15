@@ -20,8 +20,7 @@ import (
 )
 
 type peFile struct {
-	pe                    *pe.File
-	dataAfterSectionCache map[*pe.Section][]byte
+	pe *pe.File
 }
 
 func openPE(r io.ReaderAt) (rawFile, error) {
@@ -29,7 +28,7 @@ func openPE(r io.ReaderAt) (rawFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peFile{f, make(map[*pe.Section][]byte)}, nil
+	return &peFile{f}, nil
 }
 
 func (f *peFile) read_memory(VA uint64, size uint64) (data []byte, err error) {
@@ -128,15 +127,6 @@ func (f *peFile) symbols() ([]Sym, error) {
 	return syms, nil
 }
 
-func (f *peFile) dataAfterSection(sec *pe.Section) []byte {
-	if data, ok := f.dataAfterSectionCache[sec]; ok {
-		return data
-	}
-	data, _ := sec.Data()
-	f.dataAfterSectionCache[sec] = data
-	return data
-}
-
 func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	var imageBase uint64
 	switch oh := f.pe.OptionalHeader.(type) {
@@ -186,7 +176,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	// 2) if not found, byte scan for it
 	for _, sec := range f.pe.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.dataAfterSection(sec)
+		data := f.pe.DataAfterSection(sec)
 
 		if !foundpcln {
 			matches := findAllOccurrences(data, pclntab_sigs)
@@ -298,7 +288,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	if len(stompedmagic_candidates) != 0 {
 		for _, sec := range f.pe.Sections {
 			// malware can split the pclntab across multiple sections, re-merge
-			data := f.dataAfterSection(sec)
+			data := f.pe.DataAfterSection(sec)
 			for _, stompedMagicCandidate := range stompedmagic_candidates {
 				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
@@ -401,7 +391,7 @@ func (f *peFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bo
 scan:
 	for _, sec := range f.pe.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.dataAfterSection(sec)
+		data := f.pe.DataAfterSection(sec)
 
 		if !foundmodule {
 			// fall back to scanning for structure using address of pclntab, which is first value in struc

@@ -59,6 +59,8 @@ type File struct {
 	closer    io.Closer
 	gnuNeed   []verneed
 	gnuVersym []byte
+
+	dataAfterSectionCache map[uint64][]byte // secVA -> dataAfterSection
 }
 
 // A SectionHeader represents a single ELF section header.
@@ -564,6 +566,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		}
 	}
 
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 
@@ -686,6 +689,10 @@ func getString(section []byte, start int) (string, bool) {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
+	if cached, ok := f.dataAfterSectionCache[uint64(target.Addr)]; ok {
+		return cached
+	}
+
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
@@ -704,6 +711,7 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
+	f.dataAfterSectionCache[uint64(target.Addr)] = data
 	return data
 }
 

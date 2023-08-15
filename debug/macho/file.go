@@ -31,7 +31,8 @@ type File struct {
 	Symtab   *Symtab
 	Dysymtab *Dysymtab
 
-	closer io.Closer
+	closer                io.Closer
+	dataAfterSectionCache map[uint64][]byte // secVA -> dataAfterSection
 }
 
 // A Load represents any Mach-O load command.
@@ -448,6 +449,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			s.ReaderAt = s.sr
 		}
 	}
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 
@@ -573,6 +575,10 @@ func (f *File) Segment(name string) *Segment {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
+	if cached, ok := f.dataAfterSectionCache[target.Addr]; ok {
+		return cached
+	}
+
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
@@ -591,6 +597,7 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
+	f.dataAfterSectionCache[target.Addr] = data
 	return data
 }
 
