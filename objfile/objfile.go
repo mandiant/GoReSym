@@ -57,8 +57,9 @@ type File struct {
 }
 
 type Entry struct {
-	name string
-	raw  rawFile
+	name           string
+	raw            rawFile
+	pclnCandidates []PclntabCandidate
 }
 
 // A Sym is a symbol defined in an executable file.
@@ -121,8 +122,8 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]PclntabCandidate, error) {
-	return f.entries[0].PCLineTable(versionOverride, knownGoTextBase)
+func (f *File) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
+	return f.entries[0].PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
 }
 
 func (f *File) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
@@ -203,11 +204,11 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]PclntabCandidate, error) {
+func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
-	// FEYE PATCH: DISABLED, We want to gopclntab table 95% of the time
+	// DISABLED, We want to gopclntab table 95% of the time
 	// if pcln, ok := e.raw.(Liner); ok {
 	// 	return pcln, nil
 	// }
@@ -215,10 +216,14 @@ func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]P
 	// Otherwise, read the pcln tables and build a Liner out of that.
 	// https://github.com/golang/go/blob/89f687d6dbc11613f715d1644b4983905293dd33/src/debug/gosym/pclntab.go#L169
 	// https://github.com/golang/go/issues/42954
-	candidates, err := e.raw.pcln()
-	if err != nil {
-		return nil, err
+	if e.pclnCandidates == nil {
+		candidates, err := e.raw.pcln()
+		if err != nil {
+			return nil, err
+		}
+		e.pclnCandidates = candidates
 	}
+	candidates := e.pclnCandidates
 
 	var finalCandidates []PclntabCandidate
 	var atLeastOneGood bool = false
@@ -232,6 +237,11 @@ func (e *Entry) PCLineTable(versionOverride string, knownGoTextBase uint64) ([]P
 		*/
 		if knownGoTextBase != 0 {
 			candidate.SecStart = knownGoTextBase
+		}
+
+		// using this VA a moduledata was successfully found, this time around we can avoid re-parsing known bad pclntab candidates
+		if knownPclntabVA != 0 && candidate.PclntabVA != knownPclntabVA {
+			continue
 		}
 
 		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart), versionOverride)

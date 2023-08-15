@@ -20,8 +20,7 @@ import (
 )
 
 type peFile struct {
-	pe                    *pe.File
-	dataAfterSectionCache map[*pe.Section][]byte
+	pe *pe.File
 }
 
 func openPE(r io.ReaderAt) (rawFile, error) {
@@ -29,7 +28,7 @@ func openPE(r io.ReaderAt) (rawFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peFile{f, make(map[*pe.Section][]byte)}, nil
+	return &peFile{f}, nil
 }
 
 func (f *peFile) read_memory(VA uint64, size uint64) (data []byte, err error) {
@@ -128,15 +127,6 @@ func (f *peFile) symbols() ([]Sym, error) {
 	return syms, nil
 }
 
-func (f *peFile) dataAfterSection(sec *pe.Section) []byte {
-	if data, ok := f.dataAfterSectionCache[sec]; ok {
-		return data
-	}
-	data, _ := sec.Data()
-	f.dataAfterSectionCache[sec] = data
-	return data
-}
-
 func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	var imageBase uint64
 	switch oh := f.pe.OptionalHeader.(type) {
@@ -186,7 +176,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	// 2) if not found, byte scan for it
 	for _, sec := range f.pe.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.dataAfterSection(sec)
+		data := f.pe.DataAfterSection(sec)
 
 		if !foundpcln {
 			matches := findAllOccurrences(data, pclntab_sigs)
@@ -298,7 +288,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 	if len(stompedmagic_candidates) != 0 {
 		for _, sec := range f.pe.Sections {
 			// malware can split the pclntab across multiple sections, re-merge
-			data := f.dataAfterSection(sec)
+			data := f.pe.DataAfterSection(sec)
 			for _, stompedMagicCandidate := range stompedmagic_candidates {
 				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
@@ -379,83 +369,51 @@ func (f *peFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bo
 	default:
 		return 0, 0, nil, fmt.Errorf("pe file format not recognized")
 	}
+	found := false
 
-	foundmodule := false
-	foundsec := false
-	var moduledata_idx int = 0
-
-	// first type to find via symbols as per normal
-	if sym, err := findPESymbol(f.pe, "runtime.firstmoduledata"); err == nil {
-		if uint32(sym.SectionNumber) <= uint32(len(f.pe.Sections)) {
-			sect := f.pe.Sections[sym.SectionNumber-1]
-			data, err := sect.Data()
-			if err == nil && sym.Value < uint32(len(data)) {
-				moduledata = data[sym.Value:]
-				foundmodule = true
-			}
-		}
-	} else {
-		// TODO: do we want to handle legacy symbols??
-	}
-
+	var moduledata_idx = 0
 scan:
 	for _, sec := range f.pe.Sections {
 		// malware can split the pclntab across multiple sections, re-merge
-		data := f.dataAfterSection(sec)
-
-		if !foundmodule {
-			// fall back to scanning for structure using address of pclntab, which is first value in struc
-			var pclntabVA_bytes []byte
-			if is64bit {
-				pclntabVA_bytes = make([]byte, 8)
-				if littleendian {
-					binary.LittleEndian.PutUint64(pclntabVA_bytes, pclntabVA)
-				} else {
-					binary.BigEndian.PutUint64(pclntabVA_bytes, pclntabVA)
-				}
+		data := f.pe.DataAfterSection(sec)
+		// fall back to scanning for structure using address of pclntab, which is first value in struc
+		var pclntabVA_bytes []byte
+		if is64bit {
+			pclntabVA_bytes = make([]byte, 8)
+			if littleendian {
+				binary.LittleEndian.PutUint64(pclntabVA_bytes, pclntabVA)
 			} else {
-				pclntabVA_bytes = make([]byte, 4)
-				if littleendian {
-					binary.LittleEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
-				} else {
-					binary.BigEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
-				}
-			}
-
-			moduledata_idx = bytes.Index(data, pclntabVA_bytes)
-			if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
-				moduledata = data[moduledata_idx:]
-				secStart = imageBase + uint64(sec.VirtualAddress)
-
-				// optionally consult ignore list, to skip past previous (bad) scan results
-				if ignorelist != nil {
-					for _, ignore := range ignorelist {
-						if ignore == secStart+uint64(moduledata_idx) {
-							continue scan
-						}
-					}
-				}
-
-				foundsec = true
-				foundmodule = true
-				break
+				binary.BigEndian.PutUint64(pclntabVA_bytes, pclntabVA)
 			}
 		} else {
-			// locate the VA of the already found data
-			moduledata_idx = bytes.Index(data, moduledata)
-			if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
-				secStart = imageBase + uint64(sec.VirtualAddress)
-				foundsec = true
-				break
+			pclntabVA_bytes = make([]byte, 4)
+			if littleendian {
+				binary.LittleEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
+			} else {
+				binary.BigEndian.PutUint32(pclntabVA_bytes, uint32(pclntabVA))
 			}
+		}
+
+		moduledata_idx = bytes.Index(data, pclntabVA_bytes)
+		if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
+			moduledata = data[moduledata_idx:]
+			secStart = imageBase + uint64(sec.VirtualAddress)
+
+			// optionally consult ignore list, to skip past previous (bad) scan results
+			if ignorelist != nil {
+				for _, ignore := range ignorelist {
+					if ignore == secStart+uint64(moduledata_idx) {
+						continue scan
+					}
+				}
+			}
+
+			found = true
+			break
 		}
 	}
 
-	if !foundmodule {
-		return 0, 0, nil, fmt.Errorf("moduledata could not be located")
-	}
-
-	if !foundsec {
+	if !found {
 		return 0, 0, nil, fmt.Errorf("moduledata containing section could not be located")
 	}
 
