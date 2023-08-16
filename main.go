@@ -66,6 +66,24 @@ type ExtractMetadata struct {
 	StdFunctions  []FuncMetadata
 }
 
+func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+	tmpFile, err := os.CreateTemp(os.TempDir(), "goresym_tmp-")
+	if err != nil {
+		return ExtractMetadata{}, fmt.Errorf("failed to create temporary file: %s", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err = tmpFile.Write(fileBytes); err != nil {
+		return ExtractMetadata{}, fmt.Errorf("failed to write bytes to temporary file: %s", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return ExtractMetadata{}, fmt.Errorf("failed to close temporary file: %s", err)
+	}
+
+	return main_impl(tmpFile.Name(), printStdPkgs, printFilePaths, printTypes, manualTypeAddress, versionOverride)
+}
+
 func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
 	extractMetadata := ExtractMetadata{}
 
