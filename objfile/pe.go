@@ -293,7 +293,7 @@ func (f *peFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
 				// We must ensure our pointer starts within the first section of the data returned by DataAfterSection so that we use the right base address
-				if pclntab_va_candidate >= (imageBase+uint64(sec.VirtualAddress)) && pclntab_va_candidate < (imageBase+uint64(sec.VirtualAddress)+uint64(sec.Size)) {
+				if pclntab_va_candidate >= (imageBase+uint64(sec.VirtualAddress)) && pclntab_va_candidate < (imageBase+uint64(sec.VirtualAddress)+uint64(sec.Size)) && pclntab_va_candidate < (imageBase+uint64(sec.VirtualAddress)+uint64(len(data))) {
 					sec_offset := pclntab_va_candidate - (imageBase + uint64(sec.VirtualAddress))
 					pclntab = data[sec_offset:]
 
@@ -359,7 +359,7 @@ func (f *peFile) pcln() (candidates []PclntabCandidate, err error) {
 	return candidates, nil
 }
 
-func (f *peFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (secStart uint64, moduledataRVA uint64, moduledata []byte, err error) {
+func (f *peFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (candidate *ModuleDataCandidate, err error) {
 	var imageBase uint64
 	switch oh := f.pe.OptionalHeader.(type) {
 	case *pe.OptionalHeader32:
@@ -367,10 +367,12 @@ func (f *peFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bo
 	case *pe.OptionalHeader64:
 		imageBase = oh.ImageBase
 	default:
-		return 0, 0, nil, fmt.Errorf("pe file format not recognized")
+		return nil, fmt.Errorf("pe file format not recognized")
 	}
 	found := false
 
+	var moduledata []uint8
+	var secStart uint64
 	var moduledata_idx = 0
 scan:
 	for _, sec := range f.pe.Sections {
@@ -414,10 +416,10 @@ scan:
 	}
 
 	if !found {
-		return 0, 0, nil, fmt.Errorf("moduledata containing section could not be located")
+		return nil, fmt.Errorf("moduledata containing section could not be located")
 	}
 
-	return secStart, secStart + uint64(moduledata_idx), moduledata, nil
+	return &ModuleDataCandidate{SecStart: secStart, ModuledataVA: secStart + uint64(moduledata_idx), Moduledata: moduledata}, nil
 }
 
 func (f *peFile) text() (textStart uint64, text []byte, err error) {

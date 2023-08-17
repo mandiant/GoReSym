@@ -38,11 +38,17 @@ type PclntabCandidate struct {
 	ParsedPclntab           *gosym.Table
 }
 
+type ModuleDataCandidate struct {
+	SecStart     uint64
+	ModuledataVA uint64
+	Moduledata   []byte
+}
+
 type rawFile interface {
 	symbols() (syms []Sym, err error)
 	pcln() (candidates []PclntabCandidate, err error)
 	pcln_scan() (candidates []PclntabCandidate, err error)
-	moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (secStart uint64, moduledataVA uint64, moduledata []byte, err error)
+	moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (candidate *ModuleDataCandidate, err error)
 	read_memory(VA uint64, size uint64) (data []byte, err error)
 	text() (textStart uint64, text []byte, err error)
 	goarch() string
@@ -273,7 +279,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 	const maxattempts = 5
 	var ignorelist []uint64
 	for i := 0; i < maxattempts; i++ {
-		secStart, moduledataVA, rawmoduleData, err := e.raw.moduledata_scan(pclntabVA, is64bit, littleendian, ignorelist)
+		moduleDataCandidate, err := e.raw.moduledata_scan(pclntabVA, is64bit, littleendian, ignorelist)
 		if err != nil {
 			continue
 		}
@@ -284,7 +290,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		case "1.20":
 			if is64bit {
 				var module ModuleData120_64
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -325,11 +331,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// https://github.com/golang/go/blob/9ecb853cf2252f3cd9ed2e7b3401d17df2d1ab06/src/runtime/symtab.go#L630-L632
 				if textAddr64(uint64(firstFunc.Entryoffset), uint64(module.Text), textsectmap) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -338,7 +344,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData120_32
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -379,11 +385,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// https://github.com/golang/go/blob/9ecb853cf2252f3cd9ed2e7b3401d17df2d1ab06/src/runtime/symtab.go#L630-L632
 				if textAddr32(uint64(firstFunc.Entryoffset), uint64(module.Text), textsectmap) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -399,7 +405,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		case "1.18":
 			if is64bit {
 				var module ModuleData118_64
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -440,11 +446,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// https://github.com/golang/go/blob/9ecb853cf2252f3cd9ed2e7b3401d17df2d1ab06/src/runtime/symtab.go#L630-L632
 				if textAddr64(uint64(firstFunc.Entryoffset), uint64(module.Text), textsectmap) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -453,7 +459,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData118_32
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -494,11 +500,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// https://github.com/golang/go/blob/9ecb853cf2252f3cd9ed2e7b3401d17df2d1ab06/src/runtime/symtab.go#L630-L632
 				if textAddr32(uint64(firstFunc.Entryoffset), uint64(module.Text), textsectmap) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -514,7 +520,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		case "1.16":
 			if is64bit {
 				var module ModuleData116_64
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -533,11 +539,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 				if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -546,7 +552,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData116_32
-				err := module.parse(rawmoduleData, littleendian)
+				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -565,11 +571,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 				if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 					// wrong moduledata, try next
-					ignorelist = append(ignorelist, moduledataVA)
+					ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 					continue
 				}
 
-				moduleData.VA = moduledataVA
+				moduleData.VA = moduleDataCandidate.ModuledataVA
 				moduleData.TextVA = uint64(module.Text)
 				moduleData.Types = uint64(module.Types)
 				moduleData.ETypes = uint64(module.Etypes)
@@ -591,7 +597,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			case "1.6":
 				if is64bit {
 					var module ModuleData12_r15_r16_64
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -610,19 +616,19 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
 					// Fake the same Types + Typelinks offsets that later moduledata's use.
 					// The base would be the normal typelinks pointer, and then we
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.LegacyTypes = module.Typelinks
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_r15_r16_32
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -641,11 +647,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.LegacyTypes.Data = pvoid64(module.Typelinks.Data)
 					moduleData.LegacyTypes.Len = uint64(module.Typelinks.Len)
@@ -655,7 +661,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			case "1.7":
 				if is64bit {
 					var module ModuleData12_r17_64
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -674,13 +680,13 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
 					// Fake the same Types + Typelinks offsets that later moduledata's use.
 					// The base would be the normal typelinks pointer, and then we
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
@@ -689,7 +695,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_r17_32
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -708,11 +714,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
@@ -742,7 +748,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			case "1.15":
 				if is64bit {
 					var module ModuleData12_64
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -761,11 +767,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)
@@ -774,7 +780,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_32
-					err := module.parse(rawmoduleData, littleendian)
+					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
 						return 0, nil, err
 					}
@@ -793,11 +799,11 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
 					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
 						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduledataVA)
+						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
 						continue
 					}
 
-					moduleData.VA = moduledataVA
+					moduleData.VA = moduleDataCandidate.ModuledataVA
 					moduleData.TextVA = uint64(module.Text)
 					moduleData.Types = uint64(module.Types)
 					moduleData.ETypes = uint64(module.Etypes)

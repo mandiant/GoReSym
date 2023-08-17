@@ -354,7 +354,7 @@ func (t *LineTable) go12Funcs() []Func {
 	// empirically gathered. Most binaries are <= UINT16_MAX, but some truly huge have >= 100000 functions
 	ft := t.funcTab()
 	if ft.Count() >= 350000 {
-		return make([]Func, 1)
+		return make([]Func, 0)
 	}
 
 	funcs := make([]Func, ft.Count())

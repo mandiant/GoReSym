@@ -237,8 +237,8 @@ func (f *goobjFile) pcln() (candidates []PclntabCandidate, err error) {
 	return nil, fmt.Errorf("pcln not available in go object file")
 }
 
-func (f *goobjFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (secStart uint64, moduledataRVA uint64, moduledata []byte, err error) {
-	return 0, 0, nil, fmt.Errorf("moduledata not implemented at this time for go object file")
+func (f *goobjFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (candidate *ModuleDataCandidate, err error) {
+	return nil, fmt.Errorf("moduledata not implemented at this time for go object file")
 }
 
 // Find returns the file name, line, and function data for the given pc.

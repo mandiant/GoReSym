@@ -235,7 +235,8 @@ func (f *elfFile) pcln_scan() (candidates []PclntabCandidate, err error) {
 			for _, stompedMagicCandidate := range stompedmagic_candidates {
 				pclntab_va_candidate := stompedMagicCandidate.PclntabVa
 
-				if pclntab_va_candidate >= sec.Addr && pclntab_va_candidate < (sec.Addr+sec.Size) {
+				// use data length as some binaries have invalid section length
+				if pclntab_va_candidate >= sec.Addr && pclntab_va_candidate < (sec.Addr+sec.Size) && pclntab_va_candidate < (sec.Addr+uint64(len(data))) {
 					sec_offset := pclntab_va_candidate - sec.Addr
 					pclntab = data[sec_offset:]
 
@@ -297,9 +298,12 @@ func (f *elfFile) pcln() (candidates []PclntabCandidate, err error) {
 	return candidates, nil
 }
 
-func (f *elfFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (secStart uint64, moduledataVA uint64, moduledata []byte, err error) {
+func (f *elfFile) moduledata_scan(pclntabVA uint64, is64bit bool, littleendian bool, ignorelist []uint64) (candidate *ModuleDataCandidate, err error) {
 	found := false
 
+	var secStart uint64
+	var moduledata []uint8
+	var moduledataVA uint64
 scan:
 	for _, sec := range f.elf.Sections {
 		// first section is all zeros, skip
@@ -347,10 +351,10 @@ scan:
 	}
 
 	if !found {
-		return 0, 0, nil, fmt.Errorf("moduledata containing section could not be located")
+		return nil, fmt.Errorf("moduledata containing section could not be located")
 	}
 
-	return secStart, moduledataVA, moduledata, nil
+	return &ModuleDataCandidate{SecStart: secStart, ModuledataVA: moduledataVA, Moduledata: moduledata}, nil
 }
 
 func (f *elfFile) text() (textStart uint64, text []byte, err error) {

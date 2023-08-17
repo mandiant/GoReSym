@@ -256,23 +256,26 @@ restartParseWithRealTextBase:
 		}
 	}
 
-	if moduleData != nil {
-		extractMetadata.ModuleMeta = *moduleData
-		if printTypes && manualTypeAddress == 0 {
-			types, err := file.ParseTypeLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
-			if err == nil {
-				extractMetadata.Types = types
-			}
+	// to be sure we got the right pclntab we had to have found a moduledat as well. If we didn't, then we failed to find the pclntab (correctly) as well
+	if moduleData == nil {
+		return ExtractMetadata{}, fmt.Errorf("no valid pclntab or moduledata found")
+	}
 
-			interfaces, err := file.ParseITabLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
-			if err == nil {
-				extractMetadata.Interfaces = interfaces
-			}
-		} else if manualTypeAddress != 0 {
-			types, err := file.ParseType(extractMetadata.Version, moduleData, uint64(manualTypeAddress), extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
-			if err == nil {
-				extractMetadata.Types = types
-			}
+	extractMetadata.ModuleMeta = *moduleData
+	if printTypes && manualTypeAddress == 0 {
+		types, err := file.ParseTypeLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
+		if err == nil {
+			extractMetadata.Types = types
+		}
+
+		interfaces, err := file.ParseITabLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
+		if err == nil {
+			extractMetadata.Interfaces = interfaces
+		}
+	} else if manualTypeAddress != 0 {
+		types, err := file.ParseType(extractMetadata.Version, moduleData, uint64(manualTypeAddress), extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
+		if err == nil {
+			extractMetadata.Types = types
 		}
 	}
 
