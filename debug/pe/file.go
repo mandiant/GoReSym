@@ -67,6 +67,7 @@ func (f *File) Close() error {
 // NewFile creates a new File for accessing a PE binary in an underlying reader.
 func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 
 	var dosheader [96]byte
@@ -172,8 +173,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			return nil, err
 		}
 	}
-
-	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 

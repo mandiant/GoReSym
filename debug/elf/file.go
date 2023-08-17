@@ -244,6 +244,7 @@ func (f *File) SectionByType(typ SectionType) *Section {
 // NewFile creates a new File for accessing an ELF binary in an underlying reader.
 // The ELF binary is expected to start at position 0 in the ReaderAt.
 func NewFile(r io.ReaderAt) (*File, error) {
+
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	// Read and decode ELF identifier
 	var ident [16]uint8
@@ -255,6 +256,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 
 	f := new(File)
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	f.Class = Class(ident[EI_CLASS])
 	switch f.Class {
 	case ELFCLASS32:
@@ -565,8 +567,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			return nil, &FormatError{shoff + int64(i*shentsize), "bad section name index", names[i]}
 		}
 	}
-
-	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 

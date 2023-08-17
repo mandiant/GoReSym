@@ -231,6 +231,7 @@ func (f *File) Close() error {
 // The Mach-O binary is expected to start at position 0 in the ReaderAt.
 func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
+	f.dataAfterSectionCache = make(map[uint64][]byte)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 
 	// Read and decode Mach magic to determine byte order, size.
@@ -449,7 +450,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			s.ReaderAt = s.sr
 		}
 	}
-	f.dataAfterSectionCache = make(map[uint64][]byte)
 	return f, nil
 }
 

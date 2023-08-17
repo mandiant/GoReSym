@@ -188,6 +188,20 @@ func TestWeirdBins(t *testing.T) {
 			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
 		}
 	})
+
+	// reading the buildid with notes section at the start and alignment of 0 previously caused underflow in offset calculations
+	t.Run("zero_elf_palignment", func(t *testing.T) {
+		filePath := fmt.Sprintf("%s/test/weirdbins/%s", workingDirectory, "zero_elf_palignment")
+		if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
+			t.Errorf("Test file %s doesn't exist\n", filePath)
+			return
+		}
+
+		_, err := main_impl(filePath, true, true, true, 0, "")
+		if err == nil {
+			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
+		}
+	})
 }
 
 func TestBig(t *testing.T) {
