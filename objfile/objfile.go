@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/mandiant/GoReSym/objabi"
 	"io"
 	"os"
 	"sort"
@@ -1575,7 +1576,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += name + " " + methodfunc.(Type).Str + "\n"
+					interfaceDef += name + strings.TrimPrefix(methodfunc.(Type).Str, "func") + "\n"
 					cinterfaceDef += methodfunc.(Type).CStr + " " + name + ";\n"
 				}
 			}
@@ -1641,10 +1642,16 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeNameAddr := decodePtrSizeBytes(data[0:ptrSize], is64bit, littleendian)
 					typeName, tag, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
-						if tag != "" {
-							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, field.(Type).Str, tag)
+						var fieldStr string
+						if field.(Type).kindEnum == objabi.KindStruct {
+							fieldStr = strings.TrimPrefix(field.(Type).Reconstructed, "type ")
 						} else {
-							structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
+							fieldStr = field.(Type).Str
+						}
+						if tag != "" {
+							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, fieldStr, tag)
+						} else {
+							structDef += fmt.Sprintf("\n    %-10s %s", typeName, fieldStr)
 						}
 						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
@@ -1738,10 +1745,16 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 					typeNameAddr := decodePtrSizeBytes(data[0:ptrSize], is64bit, littleendian)
 					typeName, tag, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
-						if tag != "" {
-							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, field.(Type).Str, tag)
+						var fieldStr string
+						if field.(Type).kindEnum == objabi.KindStruct {
+							fieldStr = strings.TrimPrefix(field.(Type).Reconstructed, "type ")
 						} else {
-							structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
+							fieldStr = field.(Type).Str
+						}
+						if tag != "" {
+							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, fieldStr, tag)
+						} else {
+							structDef += fmt.Sprintf("\n    %-10s %s", typeName, fieldStr)
 						}
 						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
