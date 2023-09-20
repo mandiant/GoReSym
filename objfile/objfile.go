@@ -1479,6 +1479,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
+					// TODO: parse method name
 					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
 					cinterfaceDef += methodfunc.(Type).CStr + "method" + strconv.Itoa(i) + ";\n"
 				}
@@ -1566,11 +1567,16 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 				typeAddr := moduleData.Types + uint64(method.Typ)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
+				name_ptr := moduleData.Types + uint64(method.Name)
+				name, _, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
+				if err != nil {
+					name = "method" + strconv.Itoa(i)
+				}
 
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
-					cinterfaceDef += methodfunc.(Type).CStr + " method" + strconv.Itoa(i) + ";\n"
+					interfaceDef += name + " " + methodfunc.(Type).Str + "\n"
+					cinterfaceDef += methodfunc.(Type).CStr + " " + name + ";\n"
 				}
 			}
 			interfaceDef += "\n}"
