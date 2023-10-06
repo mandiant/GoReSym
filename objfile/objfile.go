@@ -10,9 +10,7 @@ package objfile
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"github.com/mandiant/GoReSym/objabi"
 	"io"
 	"os"
 	"sort"
@@ -843,7 +841,7 @@ func (e *Entry) readVarint(address uint64) (int, int, error) {
 	}
 }
 
-func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr uint64, is64bit bool, littleendian bool) (name string, tag string, err error) {
+func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr uint64, is64bit bool, littleendian bool) (name string, err error) {
 	// name str (for <= 1.16 encodes length like this, beyond it uses a varint encoding)
 	// The first byte is a bit field containing:
 	//
@@ -876,24 +874,23 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.5":
 		fallthrough
 	case "1.6":
-		// TODO: parse field tag
 		// pointer to GoString
 		nameLen, err := e.ReadPointerSizeMem(namePtr+ptrSize, is64bit, littleendian)
 		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
 
 		deref, err := e.ReadPointerSizeMem(namePtr, is64bit, littleendian)
 		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
 
 		name_raw, err := e.raw.read_memory(deref, nameLen)
 		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
 
-		return string(name_raw), "", nil
+		return string(name_raw), nil
 	case "1.7": // types flags exists >= 1.7
 		fallthrough
 	case "1.8": // type flag tflagExtraStart exists >= 1.8
@@ -913,41 +910,22 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.15":
 		fallthrough
 	case "1.16":
-		flag, err := e.raw.read_memory(namePtr, 1)
+		name_len_raw, err := e.raw.read_memory(namePtr, 3)
 		if err != nil {
-			return "", "", errors.New("Failed to read flag")
+			return "", fmt.Errorf("Failed to read name")
 		}
 
-		name_len_raw, err := e.raw.read_memory(namePtr+1, 2)
-		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
-		}
-
-		name_len := uint16(uint16(name_len_raw[0])<<8 | uint16(name_len_raw[1]))
+		name_len := uint16(uint16(name_len_raw[1])<<8 | uint16(name_len_raw[2]))
 		name_raw, err := e.raw.read_memory(namePtr+3, uint64(name_len))
 		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
 
 		name := string(name_raw)
-
-		if flag[0] == 3 {
-			tag_len_raw, err := e.raw.read_memory(namePtr+3+uint64(name_len), 2)
-			if err != nil {
-				return "", "", errors.New("Failed to read tag")
-			}
-
-			tag_len := uint16(uint16(tag_len_raw[0])<<8 | uint16(tag_len_raw[1]))
-			tag_raw, err := e.raw.read_memory(namePtr+3+uint64(name_len)+2, uint64(tag_len))
-			if err != nil {
-				return "", "", errors.New("Failed to read tag")
-			}
-			tag = string(tag_raw)
-		}
 		if typeFlags&tflagExtraStar != 0 {
-			return name[1:], tag, nil
+			return name[1:], nil
 		} else {
-			return name, tag, nil
+			return name, nil
 		}
 	case "1.17":
 		fallthrough
@@ -960,33 +938,22 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.21":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
-			// TODO: replace all misuses of fmt.Errorf to errors.New
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
+
 		name_raw, err := e.raw.read_memory(namePtr+1+uint64(varint_len), uint64(namelen))
 		if err != nil {
-			return "", "", fmt.Errorf("Failed to read name")
+			return "", fmt.Errorf("Failed to read name")
 		}
-		name := string(name_raw)
 
-		if flag[0] == 3 {
-			varint_len, taglen, err := e.readVarint(namePtr + 1 + uint64(varint_len) + uint64(namelen))
-			if err != nil {
-				return "", "", errors.New("Failed to read tag")
-			}
-			tag_raw, err := e.raw.read_memory(namePtr+1+uint64(varint_len)+uint64(namelen)+uint64(varint_len), uint64(taglen))
-			if err != nil {
-				return "", "", errors.New("Failed to read tag")
-			}
-			tag = string(tag_raw)
-		}
+		name := string(name_raw)
 		if typeFlags&tflagExtraStar != 0 {
-			return name[1:], tag, nil
+			return name[1:], nil
 		} else {
-			return name, tag, nil
+			return name, nil
 		}
 	}
-	return "", "", fmt.Errorf("Failed to read name")
+	return "", fmt.Errorf("Failed to read name")
 }
 
 func decodePtrSizeBytes(data []byte, is64bit bool, littleendian bool) (result uint64) {
@@ -1093,7 +1060,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 
-			name, _, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1111,7 +1078,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 
-			name, _, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1130,7 +1097,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 
-			name, _, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1147,7 +1114,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 
-			name, _, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1177,7 +1144,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, _, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1193,7 +1160,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, _, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1225,7 +1192,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, _, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1241,7 +1208,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				return parsedTypesIn, fmt.Errorf("Failed to parse type")
 			}
 			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, _, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type name")
 			}
@@ -1482,7 +1449,6 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					// TODO: parse method name
 					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
 					cinterfaceDef += methodfunc.(Type).CStr + "method" + strconv.Itoa(i) + ";\n"
 				}
@@ -1572,16 +1538,11 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 				typeAddr := moduleData.Types + uint64(method.Typ)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
-				name_ptr := moduleData.Types + uint64(method.Name)
-				name, _, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
-				if err != nil {
-					name = "method" + strconv.Itoa(i)
-				}
 
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += name + strings.TrimPrefix(methodfunc.(Type).Str, "func") + "\n"
-					cinterfaceDef += methodfunc.(Type).CStr + " " + name + ";\n"
+					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
+					cinterfaceDef += methodfunc.(Type).CStr + " method" + strconv.Itoa(i) + ";\n"
 				}
 			}
 			interfaceDef += "\n}"
@@ -1644,19 +1605,9 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				field, found := parsedTypesIn.Get(typeAddr)
 				if found {
 					typeNameAddr := decodePtrSizeBytes(data[0:ptrSize], is64bit, littleendian)
-					typeName, tag, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
+					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
-						var fieldStr string
-						if field.(Type).kindEnum == objabi.KindStruct {
-							fieldStr = strings.TrimPrefix(field.(Type).Reconstructed, "type ")
-						} else {
-							fieldStr = field.(Type).Str
-						}
-						if tag != "" {
-							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, fieldStr, tag)
-						} else {
-							structDef += fmt.Sprintf("\n    %-10s %s", typeName, fieldStr)
-						}
+						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
 						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
 				}
@@ -1749,19 +1700,9 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				field, found := parsedTypesIn.Get(typeAddr)
 				if found {
 					typeNameAddr := decodePtrSizeBytes(data[0:ptrSize], is64bit, littleendian)
-					typeName, tag, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
+					typeName, err := e.readRTypeName(runtimeVersion, 0, typeNameAddr, is64bit, littleendian)
 					if err == nil {
-						var fieldStr string
-						if field.(Type).kindEnum == objabi.KindStruct {
-							fieldStr = strings.TrimPrefix(field.(Type).Reconstructed, "type ")
-						} else {
-							fieldStr = field.(Type).Str
-						}
-						if tag != "" {
-							structDef += fmt.Sprintf("\n    %-10s %s `%s`", typeName, fieldStr, tag)
-						} else {
-							structDef += fmt.Sprintf("\n    %-10s %s", typeName, fieldStr)
-						}
+						structDef += fmt.Sprintf("\n    %-10s %s", typeName, field.(Type).Str)
 						cstructDef += fmt.Sprintf("    %-10s %s;\n", field.(Type).CStr, replace_cpp_keywords(typeName))
 					}
 				}
