@@ -213,10 +213,6 @@ func (f *File) Section(name string) *Section {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
-	if cached, ok := f.dataAfterSectionCache[uint64(target.VirtualAddress)]; ok {
-		return cached
-	}
-
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
@@ -235,7 +231,6 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
-	f.dataAfterSectionCache[uint64(target.VirtualAddress)] = data
 	return data
 }
 

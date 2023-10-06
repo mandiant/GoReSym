@@ -287,6 +287,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		// there's really only 3 main versions for these internal runtime changes 1.2 (<= 1.15), 1.16 (<= 1.17), 1.18 (>= 1.18)
 		// this routine needs the pclntab version, NOT the go runtime version (ex: go 1.15 generates 1.2 style tables)
 		switch version {
+		case "1.21":
+			fallthrough
 		case "1.20":
 			if is64bit {
 				var module ModuleData120_64
@@ -932,6 +934,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.19":
 		fallthrough
 	case "1.20":
+		fallthrough
+	case "1.21":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -1175,6 +1179,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 	case "1.19":
 		fallthrough
 	case "1.20":
+		fallthrough
+	case "1.21":
 		if is64bit {
 			var rtype Rtype114_115_116_117_118_64
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1480,6 +1486,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.19":
 			fallthrough
 		case "1.20":
+			fallthrough
+		case "1.21":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1637,6 +1645,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.19":
 			fallthrough
 		case "1.20":
+			fallthrough
+		case "1.21":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer
