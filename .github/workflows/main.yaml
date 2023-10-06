@@ -1,0 +1,31 @@
+name: Build All
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '>=1.21.0'
+    - run: go version
+    - name: GoReSym Build
+      run: |
+        export GOOS=linux
+        go build && mv GoReSym GoReSym_lin
+        export GOOS=windows
+        go build && mv GoReSym.exe GoReSym_win.exe
+        export GOOS=darwin
+        go build && mv GoReSym GoReSym_mac
+        export GOOS=linux
+    - name: Zip Build
+      run: |
+        Compress-Archive -DestinationPath GoReSym.zip -LiteralPath ./GoReSym_lin, ./GoReSym_win.exe, ./GoReSym_mac -CompressionLevel Fastest
+    - name: Release
+      uses: softprops/action-gh-release@v0.1.12
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: GoReSym.zip
