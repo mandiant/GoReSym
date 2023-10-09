@@ -91,6 +91,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		if err != nil {
 			panic(err)
 		}
+		x64sig.compiledRegex = x64reg
 	}
 
 	for _, match := range FindRegex(data, x64reg) {
@@ -115,6 +116,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		if err != nil {
 			panic(err)
 		}
+		x86sig.compiledRegex = x86reg
 	}
 
 	for _, match := range FindRegex(data, x86reg) {
@@ -133,6 +135,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		if err != nil {
 			panic(err)
 		}
+		ARM64_sig.compiledRegex = arm64reg
 	}
 
 	for _, match := range FindRegex(data, arm64reg) {
@@ -163,6 +166,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		if err != nil {
 			panic(err)
 		}
+		ARM32_sig.compiledRegex = arm32reg
 	}
 
 	for _, match := range FindRegex(data, arm32reg) {
@@ -183,6 +187,7 @@ func findModuleInitPCHeader(data []byte, sectionBase uint64) []SignatureMatch {
 		if err != nil {
 			panic(err)
 		}
+		PPC_BE_sig.compiledRegex = ppcBEreg
 	}
 
 	for _, match := range FindRegex(data, ppcBEreg) {
