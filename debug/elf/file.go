@@ -689,6 +689,10 @@ func getString(section []byte, start int) (string, bool) {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
+	if cached, ok := f.dataAfterSectionCache[uint64(target.Addr)]; ok {
+		return cached
+	}
+
 	data := []byte{}
 	found := false
 	for _, s := range f.Sections {
@@ -707,6 +711,8 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
+
+	f.dataAfterSectionCache[uint64(target.Addr)] = data
 	return data
 }
 
