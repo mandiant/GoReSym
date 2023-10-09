@@ -268,6 +268,7 @@ restartParseWithRealTextBase:
 			extractMetadata.Types = types
 		}
 
+		// the ITabLinks did not always exist, older versions it will be NULL
 		interfaces, err := file.ParseITabLinks(extractMetadata.Version, moduleData, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
 		if err == nil {
 			extractMetadata.Interfaces = interfaces

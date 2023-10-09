@@ -1447,10 +1447,17 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 				typeAddr := decodePtrSizeBytes(imethoddata[ptrSize*2:ptrSize*3], is64bit, littleendian)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
+
+				name_ptr := decodePtrSizeBytes(imethoddata[0:ptrSize], is64bit, littleendian)
+				name, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
-					cinterfaceDef += methodfunc.(Type).CStr + "method" + strconv.Itoa(i) + ";\n"
+					interfaceDef += strings.Replace(methodfunc.(Type).Str, "func", name, 1) + "\n"
+					cinterfaceDef += methodfunc.(Type).CStr + " " + name + ";\n"
 				}
 			}
 			interfaceDef += "\n}"
@@ -1513,7 +1520,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			interfaceDef := "type interface {"
 			cinterfaceDef := "struct interface {\n"
 			(*_type).CStr = "interface_"
-			if *&_type.flags&tflagNamed != 0 {
+			if _type.flags&tflagNamed != 0 {
 				interfaceDef = fmt.Sprintf("type %s interface {", _type.Str)
 				cinterfaceDef = fmt.Sprintf("struct %s_interface {\n", _type.CStr)
 				(*_type).CStr = fmt.Sprintf("%s_interface", _type.CStr)
@@ -1539,10 +1546,16 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 				typeAddr := moduleData.Types + uint64(method.Typ)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 
+				name_ptr := moduleData.Types + uint64(method.Name)
+				name, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
 				methodfunc, found := parsedTypesIn.Get(typeAddr)
 				if found {
-					interfaceDef += "\nmethod" + strconv.Itoa(i) + " " + methodfunc.(Type).Str
-					cinterfaceDef += methodfunc.(Type).CStr + " method" + strconv.Itoa(i) + ";\n"
+					interfaceDef += strings.Replace(methodfunc.(Type).Str, "func", name, 1) + "\n"
+					cinterfaceDef += methodfunc.(Type).CStr + " " + name + ";\n"
 				}
 			}
 			interfaceDef += "\n}"

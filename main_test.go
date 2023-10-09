@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	_ "net/http/pprof"
@@ -50,6 +51,36 @@ func TestAllVersions(t *testing.T) {
 				if v != "15" && v != "16" {
 					if len(data.Interfaces) == 0 {
 						t.Errorf("Go %s interface parsing failed on %s: %s", v, file, err)
+					}
+				}
+
+				if v != "15" && v != "16" {
+					found_interface := false
+					for _, typ := range data.Types {
+						if typ.Str == "io.Writer" && typ.Kind == "Interface" {
+							found_interface = true
+							if !strings.Contains(typ.Reconstructed, "Write([]uint8) (int, error)") {
+								t.Errorf("Go %s interface method name recovery failed", v)
+							}
+						}
+					}
+
+					if !found_interface {
+						t.Errorf("Go %s interface recovery failed", v)
+					}
+				} else {
+					found_interface := false
+					for _, typ := range data.Types {
+						if typ.Str == "os.FileInfo" && typ.Kind == "Interface" {
+							found_interface = true
+							if !strings.Contains(typ.Reconstructed, "IsDir() bool") {
+								t.Errorf("Go %s interface method name recovery failed", v)
+							}
+						}
+					}
+
+					if !found_interface {
+						t.Errorf("Go %s interface recovery failed", v)
 					}
 				}
 
