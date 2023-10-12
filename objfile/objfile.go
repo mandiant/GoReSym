@@ -1431,7 +1431,7 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			}
 
 			interfaceDef := fmt.Sprintf("type %s interface {", _type.Str)
-			cinterfaceDef := fmt.Sprintf("struct %s_interface {\n", _type.CStr)
+			cinterfaceDef := fmt.Sprintf("struct %s {\n", _type.CStr)
 
 			// type imethod struct {
 			// 	name    *string // name of method
@@ -1519,11 +1519,9 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 			interfaceDef := "type interface {"
 			cinterfaceDef := "struct interface {\n"
-			(*_type).CStr = "interface_"
 			if _type.flags&tflagNamed != 0 {
 				interfaceDef = fmt.Sprintf("type %s interface {", _type.Str)
-				cinterfaceDef = fmt.Sprintf("struct %s_interface {\n", _type.CStr)
-				(*_type).CStr = fmt.Sprintf("%s_interface", _type.CStr)
+				cinterfaceDef = fmt.Sprintf("struct %s {\n", _type.CStr)
 			}
 
 			// type imethod struct {
