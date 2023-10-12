@@ -1221,11 +1221,17 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 	// insert into seen list
 	parsedTypesIn.Set(typeAddress, *_type)
 
+	var UintType string = ""
+	var IntType string = ""
 	var ptrSize uint64 = 0
 	if is64bit {
 		ptrSize = 8
+		IntType = "int64"
+		UintType = "uint64"
 	} else {
 		ptrSize = 4
+		IntType = "int32"
+		UintType = "uint32"
 	}
 
 	// we must parse each type to cover other types it points to
@@ -1361,6 +1367,10 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			(*_type).CReconstructed = "typedef " + elemType.(Type).CStr + "* " + (*_type).CStr + ";"
 			parsedTypesIn.Set(typeAddress, *_type)
 		}
+	case UnsafePointer:
+		// IDA doesn't reconstruct unsafe pointers, just sets them to void*, we are fine with that too
+		(*_type).CReconstructed = fmt.Sprintf("typedef void* %s", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
 	case Map:
 		// type mapType struct {
 		// 	rtype
@@ -1388,6 +1398,11 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		if err != nil {
 			return parsedTypesIn, fmt.Errorf("Failed to read Kind Array's slice")
 		}
+
+		// IDA doesn't reconstruct maps, just sets them to void*, we are fine with that too
+		// TODO: reconstruct this as a real map struct
+		(*_type).CReconstructed = fmt.Sprintf("typedef void* %s", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
 
 		parsed, _ := e.ParseType_impl(runtimeVersion, moduleData, keyTypeAddress, is64bit, littleendian, parsedTypesIn)
 		parsed2, _ := e.ParseType_impl(runtimeVersion, moduleData, elemTypeAddress, is64bit, littleendian, parsed)
@@ -1725,6 +1740,70 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			parsedTypesIn.Set(typeAddress, *_type)
 			return parsedTypesIn, nil
 		}
+	case Int:
+		(*_type).CReconstructed = fmt.Sprintf("typedef %s %s;", IntType, _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s int;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uint:
+		(*_type).CReconstructed = fmt.Sprintf("typedef %s %s;", UintType, _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uint;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Int8:
+		(*_type).CReconstructed = fmt.Sprintf("typedef int8 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s int8;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uint8:
+		(*_type).CReconstructed = fmt.Sprintf("typedef uint8 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uint8;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Int16:
+		(*_type).CReconstructed = fmt.Sprintf("typedef int16 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s int16;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uint16:
+		(*_type).CReconstructed = fmt.Sprintf("typedef uint16 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uint16;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Int32:
+		(*_type).CReconstructed = fmt.Sprintf("typedef int32 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s int32;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uint32:
+		(*_type).CReconstructed = fmt.Sprintf("typedef uint32 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uint32;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Int64:
+		(*_type).CReconstructed = fmt.Sprintf("typedef int64 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s int64;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uint64:
+		(*_type).CReconstructed = fmt.Sprintf("typedef uint64 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uint64;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Uintptr:
+		(*_type).CReconstructed = fmt.Sprintf("typedef uintptr %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s uintptr;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Float32:
+		(*_type).CReconstructed = fmt.Sprintf("typedef float32 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s float32;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Float64:
+		(*_type).CReconstructed = fmt.Sprintf("typedef float64 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s float64;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Complex64:
+		(*_type).CReconstructed = fmt.Sprintf("typedef complex64 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s complex64;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Complex128:
+		(*_type).CReconstructed = fmt.Sprintf("typedef complex128 %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s complex128;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
+	case Bool:
+		(*_type).CReconstructed = fmt.Sprintf("typedef bool %s;", _type.CStr)
+		(*_type).Reconstructed = fmt.Sprintf("type %s bool;", _type.CStr)
+		parsedTypesIn.Set(typeAddress, *_type)
 	default:
 		// this is not an error, we just may not support recursion on this 'Kind'
 	}
