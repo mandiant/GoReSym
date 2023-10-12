@@ -41,11 +41,11 @@ if iterable(hints['StdFunctions']):
 
 if iterable(hints['Types']):
     ## import all the types first (reverse order, so that child types imported first)
-    #for typ in hints['Types'][::-1]:
-    #    if typ.get('CReconstructed'):
-    #        errors = ida_typeinf.idc_parse_types(typ['CReconstructed'] + ";", ida_typeinf.HTI_PAKDEF)
-    #        if errors > 0:
-    #            print(typ['CReconstructed'], "failed to import")
+    for typ in hints['Types'][::-1]:
+        if typ.get('CReconstructed'):
+            errors = ida_typeinf.idc_parse_types(typ['CReconstructed'] + ";", ida_typeinf.HTI_PAKDEF)
+            if errors > 0:
+                print(typ['CReconstructed'], "failed to import")
 
     for typ in hints['Types']:
         print("Renaming %s to %s" % (hex(typ['VA']), typ['Str']))

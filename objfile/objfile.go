@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"sort"
 	"strconv"
@@ -1033,6 +1034,8 @@ func replace_cpp_keywords(fieldname string) string {
 		fallthrough
 	case "class":
 		return "_" + fieldname
+	case "_":
+		return "_anon" + fmt.Sprint(rand.Intn(1000))
 	}
 	return fieldname
 }
