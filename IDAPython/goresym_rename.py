@@ -43,10 +43,9 @@ def resync_local_types():
         idaapi.save_struc(struc, False)
         
 def get_type_by_name(name):
-    ti = idaapi.get_idati()
-    type_ord = idaapi.get_type_ordinal(ti, name)
-    # typ_type, typ_fields, typ_cmt, typ_fieldcmts, typ_sclass
-    return ida_typeinf.get_numbered_type(ti, type_ord)
+    t = idaapi.tinfo_t()
+    t.get_named_type(None, name)
+    return t
         
 def set_function_signature(ea, typedef):
     idaapi.apply_type(ea, ida_typeinf.parse_decl(typedef, ida_typeinf.PT_SIL), idaapi.TINFO_DEFINITE)
@@ -128,8 +127,8 @@ if iterable(hints['Types']):
         
         # IDA often thinks these are string pointers, lets undefine that, then set the type correctly
         ida_bytes.del_items(typ['VA'], 0, 4)
-        abi_typ, abi_typ_fields, _, _, _ = get_type_by_name("abi_Type")
-        idaapi.apply_type(idaapi.get_idati(), abi_typ, abi_typ_fields, typ['VA'], idaapi.TINFO_DEFINITE)
+        abi_typ = get_type_by_name("abi_Type")
+        idaapi.apply_tinfo(typ['VA'], abi_typ, idaapi.TINFO_DEFINITE)
 
 if iterable(hints['Interfaces']):
     for typ in hints['Interfaces']:
@@ -138,8 +137,8 @@ if iterable(hints['Interfaces']):
         
         # IDA often thinks these are string pointers, lets undefine that, then set the type correctly
         ida_bytes.del_items(typ['VA'], 0, 4)
-        abi_typ, abi_typ_fields, _, _, _ = get_type_by_name("abi_Type")
-        idaapi.apply_type(idaapi.get_idati(), abi_typ, abi_typ_fields, typ['VA'], idaapi.TINFO_DEFINITE)
+        abi_typ = get_type_by_name("abi_Type")
+        idaapi.apply_tinfo(typ['VA'], abi_typ, idaapi.TINFO_DEFINITE)
 
 if hints['TabMeta'] is not None:
     tabmeta = hints['TabMeta']
