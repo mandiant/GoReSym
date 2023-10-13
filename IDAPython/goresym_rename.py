@@ -5,6 +5,9 @@ import ida_funcs
 import ida_kernwin
 import ida_name
 import ida_typeinf
+import ida_auto
+import idautils
+import idc
 import json
 
 def iterable(obj):
@@ -48,7 +51,7 @@ def get_type_by_name(name):
     return t
         
 def set_function_signature(ea, typedef):
-    idaapi.apply_type(ea, ida_typeinf.parse_decl(typedef, ida_typeinf.PT_SIL), idaapi.TINFO_DEFINITE)
+    idc.apply_type(ea, idc.parse_decl(typedef, ida_typeinf.PT_SIL), idaapi.TINFO_DEFINITE)
         
 def import_primitives():
     type_map = {
@@ -83,12 +86,47 @@ def forward_declare_structs(types):
     for typ in types:
         if typ['Kind'] == 'Struct':
             ida_typeinf.idc_parse_types(f"struct {typ['CStr']};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+
+def get_script_path():
+    return os.path.dirname(os.path.realpath(sys.argv[0]))
+       
+runtime_fn_typedefs = {}
+def load_runtime_defs(go_version):
+    version_parts = go_version.split(".")
+    major_version = version_parts[0] + '.' + version_parts[1] # 1.21.2 -> 1.21
+
+    with open(f"{get_script_path()}/RuntimeDefinitions/{major_version}.json", "r", encoding="utf-8") as rp:
+        buf = rp.read()
+    runtime_defs = json.loads(buf)
+    for function_name in runtime_defs:
+        ret_typ = runtime_defs[function_name]['result']
+        ret_typ_name = runtime_defs[function_name]['result_name']
+        param_typs = runtime_defs[function_name]['parameters']
+        
+        ret_typ_ida_str = None
+        if ret_typ_name: # this is a multi-value return type, import the structure we represent this with
+            ida_typeinf.idc_parse_types(ret_typ + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+            ret_typ_ida_str = ret_typ_name
+        else:
+            ret_typ_ida_str = ret_typ # simple type, already imported
+            
+        c_fn_typdef = f"{ret_typ_ida_str} __golang {function_name}("
+        for i, param in enumerate(param_typs):
+            param_name = param['name']
+            param_type = param['type']
+            c_fn_typdef += f"{param_type} {param_name}"
+            if i != len(param_typs) - 1:
+                c_fn_typdef += ", "
+        c_fn_typdef += ")"
+        runtime_fn_typedefs[function_name] = c_fn_typdef
        
 hints = ida_kernwin.ask_file(0, "*.*", "GoReSym output file")
 with open(hints, "r", encoding="utf-8") as rp:
     buf = rp.read()
 
 hints = json.loads(buf)
+load_runtime_defs(hints['Version'])
+
 if iterable(hints['UserFunctions']):
     for func in hints['UserFunctions']:
         ida_bytes.del_items(func['Start'])
@@ -96,7 +134,7 @@ if iterable(hints['UserFunctions']):
         print("Renaming %s to %s" % (hex(func['Start']), func['FullName']))
         idaapi.add_func(func['Start'], func['End'])
         idaapi.set_name(func['Start'], func['FullName'], idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
-
+                
 if iterable(hints['StdFunctions']):
     for func in hints['StdFunctions']:
         print("Renaming %s to %s" % (hex(func['Start']), func['FullName']))
@@ -151,3 +189,17 @@ if hints['ModuleMeta'] is not None:
     va = modmeta['VA']
     if va is not None and va != 0:
         idaapi.set_name(va, 'runtime_firstmoduledata', idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
+
+# it seems to be necessary to wait before applying types
+print("Waiting for auto-analysis to complete...")
+ida_auto.auto_wait()
+print("Complete! Applying function typedefs...")
+
+for func_ea in idautils.Functions():
+    func_name = ida_funcs.get_func_name(func_ea)
+    print(func_name)
+            
+    c_fn_typdef = runtime_fn_typedefs.get(func_name.replace('.', '_'))
+    if c_fn_typdef:
+        print("TYPEDEF: " + hex(func_ea) + " " + c_fn_typdef)
+        set_function_signature(func_ea, c_fn_typdef)
