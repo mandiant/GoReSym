@@ -55,22 +55,25 @@ def set_function_signature(ea, typedef):
         
 def import_primitives():
     type_map = {
-    "BUILTIN_STRING": "string",
-    "uint8_t": "uint8",
-    "uint16_t": "uint16",
-    "uint32_t": "uint32",
-    "uint64_t": "uint64",
-    "int8_t": "int8",
-    "int16_t": "int16",
-    "int32_t": "int32",
-    "double": "float64",
-    "float": "float32",
-    "complex64_t": "complex64",
-    "complex128_t": "complex128",
-    "void*": "uintptr", # should be uint64 or uint32 depending on ptr size, but this works too
-    "uint8": "byte",
-    "int32": "rune",
-    "int": "void*" # int in GO depends on architecture size
+        "BUILTIN_STRING": "string",
+        "uint8_t": "uint8",
+        "uint16_t": "uint16",
+        "uint32_t": "uint32",
+        "uint64_t": "uint64",
+        #"int": "void*", # int in GO depends on architecture size
+        "int8_t": "int8",
+        "int16_t": "int16",
+        "int32_t": "int32",
+        "int64_t": "int64",
+        "double": "float64",
+        "float": "float32",
+        "complex64_t": "complex64",
+        "complex128_t": "complex128",
+        "void*": "uintptr", # should be uint64 or uint32 depending on ptr size, but this works too
+        "uint8": "byte",
+        "int32": "rune",
+        "BUILTIN_INTERFACE": "any", # any aliases interface
+        "void*": "unsafe_Pointer",
     }
     
     ida_typeinf.idc_parse_types("struct BUILTIN_INTERFACE{void *tab;void *data;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
@@ -90,11 +93,30 @@ def forward_declare_structs(types):
 def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
        
+# Controls if __golang is reg or stack abi
+def set_ida_golang_abi(reg_abi_on):
+    # alternative ida_loader.load_and_run_plugin("golang", 118)
+    # value = node.supval(0, 'A')
+    
+    node = idaapi.netnode("$ golang", 0, True)
+    if reg_abi_on:
+        REG_ABI_ON = 118
+        node.supset(0, REG_ABI_ON.to_bytes(8, byteorder = 'little'), 'A')
+    else:
+        REG_ABI_OFF = 0
+        node.supset(0, REG_ABI_OFF.to_bytes(8, byteorder = 'little'), 'A')
+
 runtime_fn_typedefs = {}
 def load_runtime_defs(go_version):
     version_parts = go_version.split(".")
     major_version = version_parts[0] + '.' + version_parts[1] # 1.21.2 -> 1.21
-
+    minor_version = version_parts[1]
+    
+    if version_parts[0] == "1" and int(minor_version) >= 17:
+        set_ida_golang_abi(True)
+    else:
+        set_ida_golang_abi(False)
+    
     with open(f"{get_script_path()}/RuntimeDefinitions/{major_version}.json", "r", encoding="utf-8") as rp:
         buf = rp.read()
     runtime_defs = json.loads(buf)
@@ -105,8 +127,9 @@ def load_runtime_defs(go_version):
         
         ret_typ_ida_str = None
         if ret_typ_name: # this is a multi-value return type, import the structure we represent this with
-            ida_typeinf.idc_parse_types(ret_typ + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+            status = ida_typeinf.idc_parse_types(ret_typ + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
             ret_typ_ida_str = ret_typ_name
+            print("Imported: " + ret_typ_name + " " + str(status))
         else:
             ret_typ_ida_str = ret_typ # simple type, already imported
             
@@ -119,13 +142,13 @@ def load_runtime_defs(go_version):
                 c_fn_typdef += ", "
         c_fn_typdef += ")"
         runtime_fn_typedefs[function_name] = c_fn_typdef
-       
+ 
 hints = ida_kernwin.ask_file(0, "*.*", "GoReSym output file")
 with open(hints, "r", encoding="utf-8") as rp:
     buf = rp.read()
 
 hints = json.loads(buf)
-load_runtime_defs(hints['Version'])
+import_primitives()
 
 if iterable(hints['UserFunctions']):
     for func in hints['UserFunctions']:
@@ -143,9 +166,7 @@ if iterable(hints['StdFunctions']):
         idaapi.add_func(func['Start'], func['End'])
         idaapi.set_name(func['Start'], func['FullName'], idaapi.SN_NOWARN | idaapi.SN_NOCHECK | ida_name.SN_FORCE)
 
-if iterable(hints['Types']):
-    import_primitives()
-    
+if iterable(hints['Types']):    
     # we must do this to prevent IDA from creating an invalid struct of type int when we import things like typedef <class>* <newname>.
     # it would have made typedef struct <class> int; without a forward declaration. That would then break importing the class later with redefinition error.
     forward_declare_structs(hints['Types'])
@@ -156,7 +177,6 @@ if iterable(hints['Types']):
             if errors > 0:
                 print(typ['CReconstructed'], "failed to import")
         
-    # just for precation
     resync_local_types()
                 
     for typ in hints['Types']:
@@ -195,6 +215,7 @@ print("Waiting for auto-analysis to complete...")
 ida_auto.auto_wait()
 print("Complete! Applying function typedefs...")
 
+load_runtime_defs(hints['Version'])
 for func_ea in idautils.Functions():
     func_name = ida_funcs.get_func_name(func_ea)
     print(func_name)
