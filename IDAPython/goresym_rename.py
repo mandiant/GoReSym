@@ -53,6 +53,25 @@ def get_type_by_name(name):
 def set_function_signature(ea, typedef):
     idc.apply_type(ea, idc.parse_decl(typedef, ida_typeinf.PT_SIL), idaapi.TINFO_DEFINITE)
         
+# special types needed for other imports that we can't necessary expect to be recovered from the pclntab symbols
+def import_special_types():
+    ida_special_types = [
+        "typedef uint8 _32_uint8[32]",
+        "typedef _32_uint8* _ptr_32_uint8",
+        "typedef int32 _32_int32[32]",
+        "typedef _32_int32* _ptr_32_int32",
+        "typedef uint8 _4_uint8[4]",
+        "typedef _4_uint8* _ptr_4_uint8",
+        "struct _slice_unsafe_Pointer{unsafe_Pointer *ptr;size_t len;size_t cap;}",
+        "struct abi_MapType{abi_Type Type;abi_Type* Key;abi_Type* Elem;abi_Type* Bucket;void* hasherFn;uint8 KeySize;uint8 ValueSize;uint16 BucketSize;uint32 Flags;}",
+        "typedef abi_MapType* _ptr_abi_MapType",
+        "struct runtime_hiter {unsafe_Pointer key;unsafe_Pointer elem;unsafe_Pointer t;unsafe_Pointer h;unsafe_Pointer buckets;unsafe_Pointer bptr;_slice_unsafe_Pointer* overflow;_slice_unsafe_Pointer* oldoverflow;uintptr startBucket;uint8 offset;bool wrapped;uint8 B;uint8 i;uintptr bucket;uintptr checkBucket;}",
+        "typedef runtime_hiter* _ptr_runtime_hiter",
+    ]
+    
+    for special in ida_special_types:
+        ida_typeinf.idc_parse_types(special + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+        
 def import_primitives():
     type_map = {
         "BUILTIN_STRING": "string",
@@ -73,8 +92,12 @@ def import_primitives():
         "uint8": "byte",
         "int32": "rune",
         "BUILTIN_INTERFACE": "any", # any aliases interface
+        "BUILTIN_INTERFACE": "Interface", # Interface in source aliases IDAs builtin
         "void*": "unsafe_Pointer",
     }
+    
+    # special types needed for other imports that we can't necessary expect to be recovered from the pclntab symbols
+    
     
     ida_typeinf.idc_parse_types("struct BUILTIN_INTERFACE{void *tab;void *data;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
     ida_typeinf.idc_parse_types("struct BUILTIN_STRING{char *ptr;size_t len;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
@@ -146,7 +169,7 @@ def load_runtime_defs(go_version):
 hints = ida_kernwin.ask_file(0, "*.*", "GoReSym output file")
 with open(hints, "r", encoding="utf-8") as rp:
     buf = rp.read()
-
+ 
 hints = json.loads(buf)
 import_primitives()
 
@@ -215,7 +238,10 @@ print("Waiting for auto-analysis to complete...")
 ida_auto.auto_wait()
 print("Complete! Applying function typedefs...")
 
+import_special_types()
 load_runtime_defs(hints['Version'])
+resync_local_types()
+
 for func_ea in idautils.Functions():
     func_name = ida_funcs.get_func_name(func_ea)
     print(func_name)
@@ -224,3 +250,5 @@ for func_ea in idautils.Functions():
     if c_fn_typdef:
         print("TYPEDEF: " + hex(func_ea) + " " + c_fn_typdef)
         set_function_signature(func_ea, c_fn_typdef)
+        
+resync_local_types()
