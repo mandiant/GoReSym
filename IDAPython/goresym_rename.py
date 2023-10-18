@@ -140,7 +140,7 @@ def load_runtime_defs(go_version):
     else:
         set_ida_golang_abi(False)
     
-    with open(f"{get_script_path()}/RuntimeDefinitions/{major_version}.json", "r", encoding="utf-8") as rp:
+    with open(f"{get_script_path()}/RuntimeDefinitions/go{major_version}.json", "r", encoding="utf-8") as rp:
         buf = rp.read()
     runtime_defs = json.loads(buf)
     for function_name in runtime_defs:
