@@ -70,7 +70,7 @@ def import_special_types():
     ]
     
     for special in ida_special_types:
-        ida_typeinf.idc_parse_types(special + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+        ida_typeinf.idc_parse_types(special + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
         
 def import_primitives():
     type_map = {
@@ -99,19 +99,19 @@ def import_primitives():
     # special types needed for other imports that we can't necessary expect to be recovered from the pclntab symbols
     
     
-    ida_typeinf.idc_parse_types("struct BUILTIN_INTERFACE{void *tab;void *data;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
-    ida_typeinf.idc_parse_types("struct BUILTIN_STRING{char *ptr;size_t len;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+    ida_typeinf.idc_parse_types("struct BUILTIN_INTERFACE{void *tab;void *data;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
+    ida_typeinf.idc_parse_types("struct BUILTIN_STRING{char *ptr;size_t len;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
     
-    ida_typeinf.idc_parse_types("struct complex64_t{float real;float imag;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
-    ida_typeinf.idc_parse_types("struct complex128_t{double real;double imag;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+    ida_typeinf.idc_parse_types("struct complex64_t{float real;float imag;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
+    ida_typeinf.idc_parse_types("struct complex128_t{double real;double imag;};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
     
     for ida_type, gotype in type_map.items():
-        ida_typeinf.idc_parse_types(f"typedef {ida_type} {gotype};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+        ida_typeinf.idc_parse_types(f"typedef {ida_type} {gotype};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
        
 def forward_declare_structs(types):
     for typ in types:
         if typ['Kind'] == 'Struct':
-            ida_typeinf.idc_parse_types(f"struct {typ['CStr']};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+            ida_typeinf.idc_parse_types(f"struct {typ['CStr']};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
 
 def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -150,9 +150,8 @@ def load_runtime_defs(go_version):
         
         ret_typ_ida_str = None
         if ret_typ_name: # this is a multi-value return type, import the structure we represent this with
-            status = ida_typeinf.idc_parse_types(ret_typ + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
+            status = ida_typeinf.idc_parse_types(ret_typ + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
             ret_typ_ida_str = ret_typ_name
-            print("Imported: " + ret_typ_name + " " + str(status))
         else:
             ret_typ_ida_str = ret_typ # simple type, already imported
             
@@ -196,9 +195,7 @@ if iterable(hints['Types']):
     
     for typ in hints['Types'][::-1]:
         if typ.get('CReconstructed'):
-            errors = ida_typeinf.idc_parse_types(typ['CReconstructed'] + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
-            if errors > 0:
-                print(typ['CReconstructed'], "failed to import")
+            errors = ida_typeinf.idc_parse_types(typ['CReconstructed'] + ";", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL | ida_typeinf.PT_SIL)
         
     resync_local_types()
                 
@@ -244,11 +241,9 @@ resync_local_types()
 
 for func_ea in idautils.Functions():
     func_name = ida_funcs.get_func_name(func_ea)
-    print(func_name)
-            
+
     c_fn_typdef = runtime_fn_typedefs.get(func_name.replace('.', '_'))
     if c_fn_typdef:
-        print("TYPEDEF: " + hex(func_ea) + " " + c_fn_typdef)
         set_function_signature(func_ea, c_fn_typdef)
         
 resync_local_types()
