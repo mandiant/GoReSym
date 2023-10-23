@@ -30,8 +30,13 @@ def resync_local_types():
     for ord in range(1, idaapi.get_ordinal_qty(None)):
         t = idaapi.tinfo_t()
         t.get_numbered_type(None, ord)
-        typename = t.get_type_name()
-        if typename.startswith('#'):
+        
+        typename = ''
+        try:
+            typename = t.get_type_name()
+            if typename.startswith('#'):
+                continue
+        except:
             continue
         
         autosync = is_autosync(typename, t)
