@@ -227,8 +227,12 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 	data_len := len(data)
 	matches := make([]int, 0)
+
+	// use an optimized memscan to find some candidates chunks from the much large haystack
 	needleMatches := findAllOccurrences(data, [][]byte{regexInfo.needle})
 	for _, needleMatch := range needleMatches {
+		// we might have found a needle beginning at the very end of our regex
+		// widen the window to regex scan from the [-regexLen:regexLen] so we scan the front too
 		data_start := needleMatch - regexInfo.len
 		data_end := needleMatch + regexInfo.len
 		if data_start >= data_len {
@@ -241,8 +245,11 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 			data_end = data_len - 1
 		}
 
+		// do the full regex scan on a very small chunk
 		for _, reMatch := range regexInfo.re.FindAllIndex(data[data_start:data_end], -1) {
-			start := reMatch[0]
+			// the match offset is the start index of the chunk + reMatch index
+			start := reMatch[0] + data_start
+
 			//end := reMatch[1]
 			matches = append(matches, start)
 		}
