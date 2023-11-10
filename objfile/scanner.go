@@ -43,7 +43,7 @@ type SignatureMatch struct {
 // 0x000000000044D811: EB 0D                                   jmp     short loc_44D820
 // 0x000000000044D813: 48 8B 89 30 02 00 00                    mov     rcx, [rcx+230h]
 // 0x000000000044D81A: 66 0F 1F 44 00 00                       nop     word ptr [rax+rax+00h]    <- always seems to be present
-var x64sig = signatureModuleDataInitx64{3, 7, `{ 48 8D 0? ?? ?? ?? ?? EB ?? 48 8? 8? ?? 02 00 00 66 0F 1F 44 00 00 }`, nil}
+var x64sig = signatureModuleDataInitx64{3, 7, `{ 48 8D 0? ?? ?? ?? ?? E? ?? 48 8? 8? ?? 02 00 00 66 0F 1F 44 00 00 }`, nil}
 
 // 0x00438A94: 8D 05 60 49 6A 00                       lea     eax, off_6A4960
 // 0x00438A9A: EB 1A                                   jmp     short loc_438AB6
