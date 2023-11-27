@@ -11,7 +11,7 @@ The upstream Go runtime code is extended to handle:
 # Usage
 Refer to https://www.mandiant.com/resources/blog/golang-internals-symbol-recovery for reverse engineering details and example usage.
 
-You can download pre-built `linux`, `macos,and `windows` GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/).
+You can download pre-built `linux`, `macos`, and `windows` GoReSym binaries from the [Releases tab](https://github.com/mandiant/GoReSym/releases/).
 
 To build from source with a recent Go compiler, invoke the Go compiler:
 
