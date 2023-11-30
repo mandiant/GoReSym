@@ -701,14 +701,11 @@ func (f *File) DataAfterSection(target *Section) []byte {
 		}
 
 		if found {
-			raw, err := s.Data()
+			raw, _ := s.Data()
 			if raw != nil {
 				data = append(data, raw[:]...)
 			}
-
-			if err != nil {
-				break
-			}
+			break
 		}
 	}
 
