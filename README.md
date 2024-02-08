@@ -78,7 +78,6 @@ Here are all the available flags:
 To import this information into IDA Pro you can run the script found in [https://github.com/mandiant/GoReSym/blob/master/IDAPython/goresym_rename.py](IDAPython/goresym_rename.py). It will read a json file produced by GoReSym and set symbols/labels in IDA.
     
 # Version Support
-
 As the Go compiler and runtime have changed, so have the embedded metadata structures. GoReSym supports the following combinations of Go releases & metadata:
 
 * all combinations of ARM64  𝒙  Intel x86/x64  𝒙  MACH-O/ELF/PE  𝒙  big/little endian
@@ -88,7 +87,7 @@ As the Go compiler and runtime have changed, so have the embedded metadata struc
 
 The `moduledata` table used to extract types doesn't exist prior to Go 1.5, so this library will never support extracting types from very old Go versions.
 
-This library current handles legacy `pclntab` (pre Go 1.2), 1.2, 1.16, 1.18, 1.19, 1.20, 1.21, 1.22.
+This library current handles the `pclntab` layouts pre 1.2, 1.2, 1.16, 1.18, and 1.20. Note that the pclntab version is always <= the Go runtime version (ex: Go runtime 1.19 uses the 1.18 pclntab layout), we aim to _always support the latest runtime versions_.
 
 # Contributions
 Much of the source code from GoReSym is copied from the upstream Go compiler source directory  `/internal`. To make this work, we've had to massage the source a bit. If you want to contribute to GoReSym, read on so we can explain this import process.
