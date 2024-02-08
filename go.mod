@@ -1,6 +1,6 @@
 module github.com/mandiant/GoReSym
 
-go 1.21
+go 1.22
 
 require (
 	github.com/elliotchance/orderedmap v1.4.0
