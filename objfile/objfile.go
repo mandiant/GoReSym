@@ -277,10 +277,17 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		runtimeVersion = parts[0] + "." + parts[1]
 	}
 
+	var moduleDataCandidate *ModuleDataCandidate = nil
+
 	const maxattempts = 5
 	var ignorelist []uint64
 	for i := 0; i < maxattempts; i++ {
-		moduleDataCandidate, err := e.raw.moduledata_scan(pclntabVA, is64bit, littleendian, ignorelist)
+		// we're trying again, ignore the previous candidate
+		if moduleDataCandidate != nil {
+			ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
+		}
+
+		moduleDataCandidate, err = e.raw.moduledata_scan(pclntabVA, is64bit, littleendian, ignorelist)
 		if err != nil {
 			continue
 		}
@@ -295,18 +302,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData121_64
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -349,18 +356,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData121_32
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -410,18 +417,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData120_64
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -464,18 +471,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData120_32
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -525,18 +532,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData118_64
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -579,18 +586,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData118_32
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab118
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// prevent loop on invalid modules with bogus length
@@ -640,18 +647,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData116_64
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab12_116_64
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -672,18 +679,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				var module ModuleData116_32
 				err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				var firstFunc FuncTab12_116_32
 				ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				err = firstFunc.parse(ftab_raw, littleendian)
 				if err != nil {
-					return 0, nil, err
+					continue
 				}
 
 				// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -717,18 +724,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_r15_r16_64
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_64
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -748,18 +755,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_r15_r16_32
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_32
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -781,18 +788,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_r17_64
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_64
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -815,18 +822,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_r17_32
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_32
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -868,18 +875,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_64
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_64
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -900,18 +907,18 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					var module ModuleData12_32
 					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					var firstFunc FuncTab12_116_32
 					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					err = firstFunc.parse(ftab_raw, littleendian)
 					if err != nil {
-						return 0, nil, err
+						continue
 					}
 
 					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
@@ -938,7 +945,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		}
 	}
 
-	// should only happen if all scans and validation fail
+	// should only happen if all scan attempts and validation fail
 	return 0, nil, fmt.Errorf("moduledata not found")
 }
 
