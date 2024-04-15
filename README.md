@@ -74,7 +74,8 @@ Here are all the available flags:
 * `-m <virtual address>` ("manual", optional) flag will dump the `RTYPE` structure recursively at the given virtual address
 * `-v <version string>` ("version", optional) flag will override automated version detection and use the provided version. This is needed for some stripped binaries. Type parsing will fail if the version is not accurate.
 * `-human` (optional) flag will print a flat text listing instead of JSON. Especially useful when printing structure and interface types.
-
+* `-about` (optional) flag with print out license information
+  
 To import this information into IDA Pro you can run the script found in [https://github.com/mandiant/GoReSym/blob/master/IDAPython/goresym_rename.py](IDAPython/goresym_rename.py). It will read a json file produced by GoReSym and set symbols/labels in IDA.
     
 # Version Support
