@@ -418,6 +418,7 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("GoReSym: ")
 
+	about := flag.Bool("about", false, "Print license and author information")
 	printStdPkgs := flag.Bool("d", false, "Print Default Packages")
 	printFilePaths := flag.Bool("p", false, "Print File Paths")
 	printTypes := flag.Bool("t", false, "Print types automatically, enumerate typelinks and itablinks")
@@ -425,6 +426,16 @@ func main() {
 	versionOverride := flag.String("v", "", "Override the automated version detection, ex: 1.17. If this is wrong, parsing may fail or produce nonsense")
 	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is omitted for clarity")
 	flag.Parse()
+
+	if *about {
+		fmt.Println("GoReSym is a Golang symbol recovery tool by Google's Mandiant FLARE team. Maintained by Stephen Eckels.")
+		fmt.Println("LICENSE MIT: https://github.com/mandiant/GoReSym/blob/master/LICENSE")
+		fmt.Println("Dependencies:")
+		fmt.Println("orderedmap by elliotchance: https://github.com/elliotchance/orderedmap/blob/master/LICENSE")
+		fmt.Println("binaryregexp by rsc (The Go Authors): https://github.com/rsc/binaryregexp/blob/master/LICENSE")
+		fmt.Println("Go source code (The Go Authors): https://github.com/golang/go/blob/master/LICENSE")
+		os.Exit(0)
+	}
 
 	if flag.NArg() != 1 {
 		fmt.Println(TextToJson("error", "filepath must be provided as first argument"))
