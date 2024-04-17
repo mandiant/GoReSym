@@ -1,3 +1,6 @@
 [submodule "BinjaPython"]
 	path = BinjaPython
 	url = https://github.com/xusheng6/binja-GoReSym.git
+[submodule "radare2Python"]
+	path = radare2Python
+	url = https://github.com/HanEmile/radare2-GoReSym
