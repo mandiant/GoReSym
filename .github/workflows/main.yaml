@@ -27,7 +27,7 @@ jobs:
     - name: Mac Build
       run: |
         $Env:GOOS='darwin'
-        go build -o GoReSym_mac
+        go build -o GoReSym
         Compress-Archive -DestinationPath GoReSym-mac.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
         Remove-Item ./GoReSym
     - name: Release Windows
