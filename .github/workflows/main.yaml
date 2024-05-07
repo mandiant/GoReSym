@@ -12,19 +12,36 @@ jobs:
       with:
         go-version: '>=1.21.0'
     - run: go version
-    - name: GoReSym Build
+    - name: Windows Build
+      run: |
+        $Env:GOOS='windows'
+        go build -o GoReSym.exe
+        Compress-Archive -DestinationPath GoReSym-windows.zip -LiteralPath ./GoReSym.exe -CompressionLevel Fastest
+        Remove-Item ./GoReSym.exe
+    - name: Linux Build
       run: |
         $Env:GOOS='linux'
-        go build -o GoReSym_lin
-        $Env:GOOS='windows'
-        go build -o GoReSym_win.exe
+        go build -o GoReSym
+        Compress-Archive -DestinationPath GoReSym-linux.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
+        Remove-Item ./GoReSym
+    - name: Mac Build
+      run: |
         $Env:GOOS='darwin'
         go build -o GoReSym_mac
-    - name: Zip Build
-      run: |
-        Compress-Archive -DestinationPath GoReSym.zip -LiteralPath ./GoReSym_lin, ./GoReSym_win.exe, ./GoReSym_mac -CompressionLevel Fastest
-    - name: Release
+        Compress-Archive -DestinationPath GoReSym-mac.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
+        Remove-Item ./GoReSym
+    - name: Release Windows
       uses: softprops/action-gh-release@v0.1.12
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: GoReSym.zip
+        files: GoReSym-windows.zip
+    - name: Release Linux
+      uses: softprops/action-gh-release@v0.1.12
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: GoReSym-linux.zip
+    - name: Release Mac
+      uses: softprops/action-gh-release@v0.1.12
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: GoReSym-mac.zip
