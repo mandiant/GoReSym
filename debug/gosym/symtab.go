@@ -137,7 +137,223 @@ type Func struct {
 	Locals    []*Sym // nil for Go 1.3 and later binaries
 	FrameSize int
 	LineTable *LineTable
+	FuncData  funcData
 	Obj       *Obj
+}
+
+const ( 
+	PCDATA_InlTreeIndex 	= 2
+	FUNCDATA_InlTree 		= 3
+)
+
+func (f *Func) hasInline() (uint32, uint32) {
+	npcdata := int(f.FuncData.Num_pcdata())
+	nfuncdata := int(f.FuncData.Num_funcdata())	
+
+	// check the relevant indices exist	
+	if (npcdata <= PCDATA_InlTreeIndex) || (nfuncdata <= FUNCDATA_InlTree) {
+		return 0, 0
+	}
+
+	// get the size of runtime_func actual fields
+	sz0 := f.LineTable.Ptrsize
+	if f.LineTable.Version >= ver118 {
+		sz0 = 4
+	}
+
+	func_hdr_size 	:= sz0 + (4*10) // sz of first elt + size of remaining elts
+	pcdata_size 	:= 4 * npcdata // elts in pcdata[npcdata] are 4 bytes each
+	funcdata_size 	:= 4 * nfuncdata // ^ditto	
+	
+	func_pseudofields := f.FuncData.data[func_hdr_size:] // chop off actual fields
+	pcdata_raw := func_pseudofields[:pcdata_size] // isolate just the pcdata table bytes
+	funcdata_raw := func_pseudofields[pcdata_size:] // ^ditto for funcdata table bytes
+	if len(funcdata_raw) != funcdata_size {
+		fmt.Errorf("wanted %d bytes for uint32_t funcdata[nfuncdata], got %d\n", funcdata_size, len(funcdata_raw))
+		return 0,0
+	}
+
+	// get the actual inline offsets
+	pcdata_InlIndex := f.LineTable.Binary.Uint32(pcdata_raw[4*PCDATA_InlTreeIndex:])
+	funcdata_InlTree := f.LineTable.Binary.Uint32(funcdata_raw[4*FUNCDATA_InlTree:])
+	
+	// check if these indices are ^uint32(0)
+	if pcdata_InlIndex == ^uint32(0) || funcdata_InlTree == ^uint32(0) {
+		return 0, 0
+	}
+	
+	return pcdata_InlIndex, funcdata_InlTree	
+}
+
+// go v1.16-v1.18
+type inlinedCall_v116 struct {
+	parent 	int16
+	funcId	uint8
+	_pad	uint8
+	file	int32
+	line	int32
+	func_	int32
+	parentPc	int32
+}
+
+// go v.1.20+
+type inlinedCall_v120 struct {
+	funcId	uint8
+	_pad 	[3]uint8
+	nameOff	int32
+	parentPc	int32
+	startLine	int32
+}
+
+const (
+	size_inlinedCall_v116 = 24
+	size_inlinedCall_v120 = 20
+	FUNCID_MAX	= 22 // funcID maximum value
+)
+
+type InlinedCall struct {
+	func_name	string
+	parent_name	string
+	parentPc	int32
+	parentEntry	int32
+	data 		[]byte
+}
+
+func isValidFuncID(data []byte) bool {
+	
+	if data[0] > FUNCID_MAX {
+		return false
+	}
+
+	i := 1
+	for i < 4 {
+		if data[i] != 0 {
+			return false
+		}
+		i += 1
+	}
+	
+	return true
+}
+
+// validate that calling PC falls within calling function
+func isValidPC(data []byte, f *Func) (bool, int32) {
+	var pc 			int32
+	var pc_address	uint64
+
+	// convert bytes to int32
+	// TODO -- see isValidFuncName()
+	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &pc)
+	if err != nil {
+		fmt.Println(err)
+		return false, -1 
+	}
+	
+	pc_address = uint64(pc) + f.Entry
+	if (pc_address <= f.End ) && (pc_address >= f.Entry) {	
+		return true, pc
+	} 
+
+	return false, -1
+}
+
+// TODO -- pull out binary converter to its own func for reuse
+// TODO -- check for little vs big endian
+func isValidFuncName(data []byte, f *Func) (bool, string) {
+	var nameOff	int32
+
+	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &nameOff)
+	if err != nil {
+		fmt.Println(err)
+		return false, ""
+	}
+	
+	// check that name offset falls within func name table boundaries
+	funcNameTable := f.LineTable.funcnametab 
+	if nameOff < int32(len(funcNameTable)) {
+		i := nameOff
+		for i < int32(len(funcNameTable)) {
+			// get str len by iterating until we hit a null byte
+			if funcNameTable[i] == '\000' {
+				break
+			}
+			i += 1
+			// TODO -- add check that we're not running off the end of the table
+		} 
+
+		name := string(funcNameTable[nameOff : i ])	
+		return true, name 	
+	}
+	return false, ""
+}
+
+func (f *Func) iterateInline_v116(Gofunc uint64, tree []byte) []InlinedCall {
+	var inlineList []InlinedCall
+	return inlineList
+}
+
+func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
+	var inlineList []InlinedCall
+
+	// check there are enough bytes for an inlinedCall struct
+	off := 0
+	for off < (len(tree) - size_inlinedCall_v120) {
+		// get elt bytes
+		elt_raw := tree[ off : off+size_inlinedCall_v120]
+
+		// verify funcId and padding look normal
+		if isValidFuncID(elt_raw[ : 4]) {
+			// verify calling PC exists within parent func bounds
+			is_valid_pc, pc := isValidPC(elt_raw[4:8], f) 
+			if is_valid_pc {
+				// resolve name 
+				is_valid_fname, fname := isValidFuncName(elt_raw[4:8], f)
+				if is_valid_fname {
+					// create InlinedCall object
+					// add obj to InlineList
+					fmt.Printf("got valid fname, %s, pc %x\n", fname, pc)
+				}
+			}
+		}
+	// (define runtime_inlinedCall struct type)
+	// for each elt:
+	// 	get funcnametab + offset
+	//  verify the result falls within funcnametab
+	// if verify 
+	//  check which inlineCall struct to use based on version
+	// 	save funcname
+	//  call PC
+	//  line var
+	//  create object and add to array
+		off = off + size_inlinedCall_v120
+	}
+	return inlineList
+}
+
+// TODO -- ret value isn't meaningful. remove or use. 
+func (f *Func) CheckInline(Gofunc uint64, filedata []byte) bool {
+	
+	Gofunc = Gofunc - 0x400000
+	pcdata_InlIndex, funcdata_InlTree := f.hasInline()
+	if pcdata_InlIndex == 0 && funcdata_InlTree == 0 {
+		return false
+	}
+	fmt.Printf("Gofunc 0x%x, tree 0x%x\n", Gofunc, funcdata_InlTree)
+
+
+	treeBase := Gofunc + uint64(funcdata_InlTree)
+	fmt.Printf("Total len: 0x%x, treebase: 0x%x\n", len(filedata), treeBase)
+	// TODO -- should be filedata[treeBase : treeEnd]	
+	// .... not sure how to calc end of table?
+	tree := filedata[treeBase:]
+
+	// get size of inlined struct based on version
+	if f.LineTable.Version > ver118 {
+		f.iterateInline_v120(Gofunc, tree)
+	} else {
+		f.iterateInline_v116(Gofunc, tree)
+	}
+	return true	
 }
 
 // An Obj represents a collection of functions in a symbol table.
