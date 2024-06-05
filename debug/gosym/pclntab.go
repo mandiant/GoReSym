@@ -366,6 +366,7 @@ func (t *LineTable) go12Funcs() []Func {
 		info := t.funcData(uint32(i))
 		f.LineTable = t
 		f.FrameSize = int(info.deferreturn())
+		f.FuncData = info
 		syms[i] = Sym{
 			Value:     f.Entry,
 			Type:      'T',
@@ -515,13 +516,15 @@ func (f funcData) nameoff() uint32     { return f.field(1) }
 func (f funcData) deferreturn() uint32 { return f.field(3) }
 func (f funcData) pcfile() uint32      { return f.field(5) }
 func (f funcData) pcln() uint32        { return f.field(6) }
+func (f funcData) Num_pcdata() uint32  { return f.field(7) }
 func (f funcData) cuOffset() uint32    { return f.field(8) }
+func (f funcData) Num_funcdata() uint32 { return f.field(10) }
 
 // field returns the nth field of the _func struct.
 // It panics if n == 0 or n > 9; for n == 0, call f.entryPC.
 // Most callers should use a named field accessor (just above).
 func (f funcData) field(n uint32) uint32 {
-	if n == 0 || n > 9 {
+	if n == 0 || n > 10 {
 		panic("bad funcdata field")
 	}
 	// In Go 1.18, the first field of _func changed
@@ -531,8 +534,14 @@ func (f funcData) field(n uint32) uint32 {
 		sz0 = 4
 	}
 	off := sz0 + (n-1)*4 // subsequent fields are 4 bytes each
-	data := f.data[off:]
-	return f.t.Binary.Uint32(data)
+	
+	if n == 10 { // except for the last 4 fields which are 1 byte each
+		off = off + 3 // we want the last byte
+		return uint32(f.data[off])
+	} else {
+		data := f.data[off:]
+		return f.t.Binary.Uint32(data)
+	}
 }
 
 // step advances to the next pc, value pair in the encoded table.
