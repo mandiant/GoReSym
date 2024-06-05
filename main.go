@@ -286,6 +286,8 @@ restartParseWithRealTextBase:
 		}
 	}
 
+	fileData, _ := os.ReadFile(fileName)
+	// TODO -- use error or remove
 	for _, elem := range finalTab.ParsedPclntab.Funcs {
 		if isStdPackage(elem.PackageName()) {
 			if printStdPkgs {
@@ -297,6 +299,7 @@ restartParseWithRealTextBase:
 				})
 			}
 		} else {
+			elem.CheckInline(moduleData.Gofunc, fileData)
 			extractMetadata.UserFunctions = append(extractMetadata.UserFunctions, FuncMetadata{
 				Start:       elem.Entry,
 				End:         elem.End,
@@ -305,7 +308,8 @@ restartParseWithRealTextBase:
 			})
 		}
 	}
-
+	// TODO -- remove!
+	os.Exit(0)
 	return extractMetadata, nil
 }
 
