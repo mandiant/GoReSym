@@ -17,6 +17,7 @@ import (
 	"github.com/mandiant/GoReSym/buildinfo"
 	"github.com/mandiant/GoReSym/objfile"
 	"github.com/mandiant/GoReSym/runtime/debug"
+	"github.com/mandiant/GoReSym/debug/gosym"
 )
 
 func isStdPackage(pkg string) bool {
@@ -49,6 +50,7 @@ type FuncMetadata struct {
 	End         uint64
 	PackageName string
 	FullName    string
+	InlinedList	[]gosym.InlinedCall
 }
 
 type ExtractMetadata struct {
@@ -286,6 +288,7 @@ restartParseWithRealTextBase:
 		}
 	}
 
+	// TODO -- move var above so we don't have to re-read the whole file
 	fileData, _ := os.ReadFile(fileName)
 	// TODO -- use error or remove
 	for _, elem := range finalTab.ParsedPclntab.Funcs {
@@ -299,17 +302,15 @@ restartParseWithRealTextBase:
 				})
 			}
 		} else {
-			elem.CheckInline(moduleData.Gofunc, fileData)
 			extractMetadata.UserFunctions = append(extractMetadata.UserFunctions, FuncMetadata{
 				Start:       elem.Entry,
 				End:         elem.End,
 				PackageName: elem.PackageName(),
 				FullName:    elem.Name,
+				InlinedList: elem.CheckInline(moduleData.Gofunc, fileData),
 			})
 		}
 	}
-	// TODO -- remove!
-	os.Exit(0)
 	return extractMetadata, nil
 }
 
