@@ -47,3 +47,5 @@ This info might be helpful in determining how many functions were inlined into `
 ## References
 
 [pclntab structs reference](https://github.com/elastic/otel-profiling-agent/blob/main/docs/gopclntab.md)
+[adding inline functions for golang debugger](https://developers.redhat.com/articles/2024/04/03/how-add-debug-support-go-stripped-binaries)
+[how and why inlining with source examples](https://dave.cheney.net/2020/04/25/inlining-optimisations-in-go)
