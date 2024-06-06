@@ -206,7 +206,7 @@ type inlinedCall_v120 struct {
 }
 
 const (
-	size_inlinedCall_v116 = 24
+	size_inlinedCall_v116 = 20
 	size_inlinedCall_v120 = 16 
 	FUNCID_MAX	= 22 // funcID maximum value
 )
