@@ -207,21 +207,23 @@ type inlinedCall_v120 struct {
 
 const (
 	size_inlinedCall_v116 = 24
-	size_inlinedCall_v120 = 20
+	size_inlinedCall_v120 = 16 
 	FUNCID_MAX	= 22 // funcID maximum value
 )
 
 type InlinedCall struct {
-	func_name	string
-	parent_name	string
-	parentPc	int32
-	parentEntry	int32
-	data 		[]byte
+	Funcname	string
+	ParentName	string
+	CallingPc	uint64
+	ParentEntry	uint64
+	Data 		[]byte
 }
 
 func isValidFuncID(data []byte) bool {
 	
-	if data[0] > FUNCID_MAX {
+	// TODO -- currently only accepts "FuncIDNormal" 
+	// 	We may want to include other types. 
+	if data[0] != 0 { 
 		return false
 	}
 
@@ -248,8 +250,8 @@ func isValidPC(data []byte, f *Func) (bool, int32) {
 		fmt.Println(err)
 		return false, -1 
 	}
-	
 	pc_address = uint64(pc) + f.Entry
+	//fmt.Printf("checking pc 0x%x (addr 0x%x) within 0x%x - 0x%x\n", pc, pc_address, f.Entry, f.End)
 	if (pc_address <= f.End ) && (pc_address >= f.Entry) {	
 		return true, pc
 	} 
@@ -297,63 +299,66 @@ func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
 
 	// check there are enough bytes for an inlinedCall struct
 	off := 0
-	for off < (len(tree) - size_inlinedCall_v120) {
+	// iterate until we hit invalid data 
+	//	that indicates we've read this function's entire inline tree
+	for (len(tree) - off >= size_inlinedCall_v120) {
 		// get elt bytes
 		elt_raw := tree[ off : off+size_inlinedCall_v120]
 
 		// verify funcId and padding look normal
-		if isValidFuncID(elt_raw[ : 4]) {
-			// verify calling PC exists within parent func bounds
-			is_valid_pc, pc := isValidPC(elt_raw[4:8], f) 
-			if is_valid_pc {
-				// resolve name 
-				is_valid_fname, fname := isValidFuncName(elt_raw[4:8], f)
-				if is_valid_fname {
-					// create InlinedCall object
-					// add obj to InlineList
-					fmt.Printf("got valid fname, %s, pc %x\n", fname, pc)
-				}
-			}
+		if !isValidFuncID(elt_raw[ : 4]) {
+			break
 		}
-	// (define runtime_inlinedCall struct type)
-	// for each elt:
-	// 	get funcnametab + offset
-	//  verify the result falls within funcnametab
-	// if verify 
-	//  check which inlineCall struct to use based on version
-	// 	save funcname
-	//  call PC
-	//  line var
-	//  create object and add to array
+		// verify calling PC exists within parent func bounds
+		is_valid_pc, pc := isValidPC(elt_raw[8:12], f) 
+		if !is_valid_pc {
+			break
+		}
+		// resolve name 
+		is_valid_fname, fname := isValidFuncName(elt_raw[4:8], f)
+		if !is_valid_fname {
+			break
+		}			
+		// create InlinedCall object
+		inlineList = append(inlineList, InlinedCall {
+				Funcname:		fname,
+				ParentName:		f.Name,
+				CallingPc:		uint64(pc),
+				ParentEntry:	f.Entry,					
+				Data:			elt_raw,
+		})
+		// add obj to InlineList
 		off = off + size_inlinedCall_v120
 	}
 	return inlineList
 }
 
 // TODO -- ret value isn't meaningful. remove or use. 
-func (f *Func) CheckInline(Gofunc uint64, filedata []byte) bool {
+func (f *Func) CheckInline(Gofunc uint64, filedata []byte) []InlinedCall {
 	
-	Gofunc = Gofunc - 0x400000
-	pcdata_InlIndex, funcdata_InlTree := f.hasInline()
-	if pcdata_InlIndex == 0 && funcdata_InlTree == 0 {
-		return false
+	// TODO -- check if a) gofunc is always absolute wrt to preferred address
+	// 				 and b) what the preferred load address is
+	baseAddress := uint64(0x400000)
+	Gofunc = Gofunc - baseAddress
+	pcdataInlIndex, funcdataInlTree := f.hasInline()
+	if pcdataInlIndex == 0 && funcdataInlTree == 0 {
+		return nil
 	}
-	fmt.Printf("Gofunc 0x%x, tree 0x%x\n", Gofunc, funcdata_InlTree)
 
+	//fmt.Printf("Gofunc 0x%x, tree 0x%x\n", Gofunc, funcdata_InlTree)
 
-	treeBase := Gofunc + uint64(funcdata_InlTree)
-	fmt.Printf("Total len: 0x%x, treebase: 0x%x\n", len(filedata), treeBase)
+	treeBase := Gofunc + uint64(funcdataInlTree)
+	//fmt.Printf("Total len: 0x%x, treebase: 0x%x\n", len(filedata), treeBase)
 	// TODO -- should be filedata[treeBase : treeEnd]	
 	// .... not sure how to calc end of table?
 	tree := filedata[treeBase:]
 
 	// get size of inlined struct based on version
 	if f.LineTable.Version > ver118 {
-		f.iterateInline_v120(Gofunc, tree)
+		return f.iterateInline_v120(Gofunc, tree)
 	} else {
-		f.iterateInline_v116(Gofunc, tree)
+		return f.iterateInline_v116(Gofunc, tree)
 	}
-	return true	
 }
 
 // An Obj represents a collection of functions in a symbol table.
