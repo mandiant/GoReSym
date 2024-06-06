@@ -333,7 +333,7 @@ func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
 	return inlineList
 }
 
-// TODO -- ret value isn't meaningful. remove or use. 
+// return array of inlined functions inside f or nil
 func (f *Func) CheckInline(Gofunc uint64, filedata []byte) []InlinedCall {
 	
 	// TODO -- check if a) gofunc is always absolute wrt to preferred address
