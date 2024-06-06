@@ -16,14 +16,14 @@ The documentation implies that each function that contains inlined functions wil
 5. Save `funcData.funcdata[FUNCDATA_InlTree]` -- this is the inline tree offset for `f`
 6. Get `go:func.*` via `moduledata`. (there are other ways but this is the least complicated)
 7. Adjust `go:func.*` from absolute address to file offset by subtracting the preferred base address (in file header). `go:func.* -= baseAddress`
-9. Go to inline tree. InlineTreeAddress = `go:func.*` + `funcData.funcdata[FUNCDATA_InlTree]`.  This is an offset relative to the start of the binary file because we adjusted `go:func.*` in step 7 above.
+9. Go to inline tree. `InlineTreeAddress` = `go:func.*` + `funcData.funcdata[FUNCDATA_InlTree]`.  This is an offset relative to the start of the binary file because we adjusted `go:func.*` in step 7 above.
 
    *NOTE: the inline tree and `go:func.*` addresses may be earlier in the binary than `pclntab`*
    Therefore whatever component resolves inline functions MUST have access to the full file.
 
 ## Validating inline tree entries
 
-We iterate from the InlineTreeAddress, grab enough bytes to fill a single `runtime__inlinedCall` instance. Validate its fields. If any validation check fails or there are not enough bytes to fill the struct, assume that we have reached the end of the tree. Return results.
+We iterate over the file bytes from the `InlineTreeAddress` (N.B. file bytes in toto, not bytes in `pclntab`). For each iteration, we grab enough bytes to fill a single `runtime__inlinedCall` instance. Validate its fields. If any validation check fails or there are not enough bytes to fill the struct, assume that we have reached the end of the tree. Break. Return results.
 
 ```
 Start at InlineTreeAddress.
