@@ -351,6 +351,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData121_32
@@ -410,6 +413,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.20":
@@ -466,6 +472,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData120_32
@@ -525,6 +534,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.18":
@@ -581,6 +593,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData118_32
@@ -640,6 +655,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.16":
@@ -674,6 +692,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData116_32
@@ -711,6 +732,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 
@@ -817,6 +841,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
 					moduleData.ITablinks = module.Itablinks
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_r17_32
@@ -854,6 +881,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				}
 			case "1.8":
@@ -902,6 +932,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
 					moduleData.ITablinks = module.Itablinks
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_32
@@ -939,6 +972,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+					moduleData.Gofunc = uint64(module.Gofunc)
 					return secStart, moduleData, err
 				}
 			}
