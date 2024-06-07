@@ -152,6 +152,7 @@ type ModuleData12_r15_r16_64 struct {
 	End        pvoid64
 	Gcdata     pvoid64
 	Gcbss      pvoid64
+	Gofunc 	   pvoid64
 
 	Typelinks GoSlice64
 
@@ -197,6 +198,7 @@ type ModuleData12_r15_r16_32 struct {
 	End        pvoid32
 	Gcdata     pvoid32
 	Gcbss      pvoid32
+	Gofunc 	   pvoid64
 
 	Typelinks GoSlice32
 
@@ -242,6 +244,7 @@ type ModuleData12_r17_64 struct {
 	End        pvoid64
 	Gcdata     pvoid64
 	Gcbss      pvoid64
+	Gofunc	   pvoid64
 	Types      pvoid64
 	Etypes     pvoid64
 
@@ -292,6 +295,7 @@ type ModuleData12_r17_32 struct {
 	End        pvoid32
 	Gcdata     pvoid32
 	Gcbss      pvoid32
+	Gofunc 	   pvoid64
 	Types      pvoid32
 	Etypes     pvoid32
 
@@ -341,6 +345,7 @@ type ModuleData12_64 struct {
 	End          pvoid64
 	Gcdata       pvoid64
 	Gcbss        pvoid64
+	Gofunc	     pvoid64
 	Types        pvoid64
 	Etypes       pvoid64
 	Textsectmap  GoSlice64
@@ -392,6 +397,7 @@ type ModuleData12_32 struct {
 	End          pvoid32
 	Gcdata       pvoid32
 	Gcbss        pvoid32
+	Gofunc		 pvoid64
 	Types        pvoid32
 	Etypes       pvoid32
 	Textsectmap  GoSlice32
@@ -447,6 +453,7 @@ type ModuleData116_64 struct {
 	End          pvoid64
 	Gcdata       pvoid64
 	Gcbss        pvoid64
+	Gofunc 		 pvoid64
 	Types        pvoid64
 	Etypes       pvoid64
 	Textsectmap  GoSlice64
@@ -502,6 +509,7 @@ type ModuleData116_32 struct {
 	End          pvoid32
 	Gcdata       pvoid32
 	Gcbss        pvoid32
+	Gofunc		 pvoid64
 	Types        pvoid32
 	Etypes       pvoid32
 	Textsectmap  GoSlice32
@@ -1301,6 +1309,7 @@ type ModuleData struct {
 	ETypes    uint64    // points to end of type information
 	Typelinks GoSlice64 // points to metadata about offsets into types for structures and other types
 	ITablinks GoSlice64 // points to metadata about offsets into types for interfaces
+	Gofunc	  uint64 	// offset used for calculating inline trees
 
 	// Some versions of go with 1.2 moduledata use a slice instead of the types + offset typelinks list
 	LegacyTypes GoSlice64
