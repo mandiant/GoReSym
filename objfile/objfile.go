@@ -211,7 +211,7 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
+func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64, knownGofuncVa uint64) ([]PclntabCandidate, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
@@ -251,7 +251,11 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 			continue
 		}
 
-		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart), versionOverride)
+		if knownGofuncVA != 0 {
+			candidate.Gofunc = knownGofuncVA
+		}
+		
+		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart, candidate.Gofunc), versionOverride)
 		if err != nil || parsedTable.Go12line == nil {
 			continue
 		}
