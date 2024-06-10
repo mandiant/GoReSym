@@ -172,8 +172,8 @@ func (t *LineTable) LineToPC(line int, maxpc uint64) uint64 {
 // corresponding to the encoded data.
 // Text must be the start address of the
 // corresponding text segment.
-func NewLineTable(data []byte, text uint64) *LineTable {
-	return &LineTable{Data: data, PC: text, Line: 0, funcNames: make(map[uint32]string), strings: make(map[uint32]string)}
+func NewLineTable(data []byte, text uint64, gofunc uint64) *LineTable {
+	return &LineTable{Data: data, PC: text, Gofunc: gofunc, Line: 0, funcNames: make(map[uint32]string), strings: make(map[uint32]string)}
 }
 
 // Go 1.2 symbol table format.
