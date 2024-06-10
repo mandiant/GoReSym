@@ -66,6 +66,7 @@ func (v version) String() string {
 type LineTable struct {
 	Data []byte
 	PC   uint64
+	Gofunc uint64
 	Line int
 
 	// This mutex is used to keep parsing of pclntab synchronous.
