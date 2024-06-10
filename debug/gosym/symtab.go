@@ -128,6 +128,42 @@ func (s *Sym) BaseName() string {
 	return s.Name
 }
 
+
+// go v1.16-v1.18
+type inlinedCall_v116 struct {
+	parent 	int16
+	funcId	uint8
+	_pad	uint8
+	file	int32
+	line	int32
+	func_	int32
+	parentPc	int32
+}
+
+// go v.1.20+
+type inlinedCall_v120 struct {
+	funcId	uint8
+	_pad 	[3]uint8
+	nameOff	int32
+	parentPc	int32
+	startLine	int32
+}
+
+const (
+	size_inlinedCall_v116 = 20
+	size_inlinedCall_v120 = 16 
+	FUNCID_MAX	= 22 // funcID maximum value
+)
+
+// An InlinedCall collects information about a function that has been inlined as well as its parent
+type InlinedCall struct {
+	Funcname	string
+	ParentName	string
+	CallingPc	uint64
+	ParentEntry	uint64
+	Data 		[]byte
+}
+
 // A Func collects information about a single function.
 type Func struct {
 	Entry uint64
@@ -138,12 +174,13 @@ type Func struct {
 	FrameSize int
 	LineTable *LineTable
 	FuncData  funcData
+	InlineList []InlinedCall
 	Obj       *Obj
 }
 
 const ( 
 	PCDATA_InlTreeIndex 	= 2
-	FUNCDATA_InlTree 		= 3
+	FUNCDATA_InlTree 	= 3
 )
 
 func (f *Func) hasInline() (uint32, uint32) {
@@ -183,40 +220,6 @@ func (f *Func) hasInline() (uint32, uint32) {
 	}
 	
 	return pcdata_InlIndex, funcdata_InlTree	
-}
-
-// go v1.16-v1.18
-type inlinedCall_v116 struct {
-	parent 	int16
-	funcId	uint8
-	_pad	uint8
-	file	int32
-	line	int32
-	func_	int32
-	parentPc	int32
-}
-
-// go v.1.20+
-type inlinedCall_v120 struct {
-	funcId	uint8
-	_pad 	[3]uint8
-	nameOff	int32
-	parentPc	int32
-	startLine	int32
-}
-
-const (
-	size_inlinedCall_v116 = 20
-	size_inlinedCall_v120 = 16 
-	FUNCID_MAX	= 22 // funcID maximum value
-)
-
-type InlinedCall struct {
-	Funcname	string
-	ParentName	string
-	CallingPc	uint64
-	ParentEntry	uint64
-	Data 		[]byte
 }
 
 func isValidFuncID(data []byte) bool {
