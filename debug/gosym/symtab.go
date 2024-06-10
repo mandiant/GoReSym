@@ -174,7 +174,7 @@ type Func struct {
 	FrameSize int
 	LineTable *LineTable
 	FuncData  funcData
-	InlineList []InlinedCall
+	InlinedList []InlinedCall
 	Obj       *Obj
 }
 
