@@ -33,6 +33,7 @@ type StompMagicCandidate struct {
 type PclntabCandidate struct {
 	SecStart                uint64
 	PclntabVA               uint64
+	GofuncVA		uint64
 	StompMagicCandidateMeta *StompMagicCandidate // some search modes might optimistically try to find moduledata or guess endianess, these hints must match the found moduleData VA later to be considered good candidate
 	Pclntab                 []byte
 	Symtab                  []byte // optional
