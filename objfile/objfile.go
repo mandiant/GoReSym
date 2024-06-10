@@ -253,10 +253,10 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 		}
 
 		if knownGofuncVA != 0 {
-			candidate.Gofunc
+			candidate.GofuncVA
 		}
 		
-		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart, candidate.Gofunc), versionOverride)
+		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart, candidate.GofuncVA), versionOverride)
 		if err != nil || parsedTable.Go12line == nil {
 			continue
 		}
