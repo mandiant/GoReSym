@@ -130,8 +130,8 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
-	return f.entries[0].PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
+func (f *File) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64, knownGofuncVA uint64) ([]PclntabCandidate, error) {
+	return f.entries[0].PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase, knownGofuncVA)
 }
 
 func (f *File) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
