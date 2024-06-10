@@ -288,9 +288,6 @@ restartParseWithRealTextBase:
 		}
 	}
 
-	// TODO -- move var above so we don't have to re-read the whole file
-	fileData, _ := os.ReadFile(fileName)
-	// TODO -- use error or remove
 	for _, elem := range finalTab.ParsedPclntab.Funcs {
 		if isStdPackage(elem.PackageName()) {
 			if printStdPkgs {
@@ -307,7 +304,7 @@ restartParseWithRealTextBase:
 				End:         elem.End,
 				PackageName: elem.PackageName(),
 				FullName:    elem.Name,
-				InlinedList: elem.CheckInline(moduleData.Gofunc, fileData),
+				InlinedList: elem.InlinedList,
 			})
 		}
 	}
