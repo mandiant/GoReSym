@@ -308,6 +308,7 @@ restartParseWithRealTextBase:
 				FullName:    elem.Name,
 				InlinedList: elem.InlinedList,
 			})
+			fmt.Printf("%s -- inlined list # %d\n", elem.Name, len(elem.InlinedList))
 		}
 	}
 	return extractMetadata, nil
