@@ -66,6 +66,7 @@ func (v version) String() string {
 type LineTable struct {
 	Data []byte
 	PC   uint64
+	GofuncVA uint64
 	Line int
 
 	// This mutex is used to keep parsing of pclntab synchronous.
@@ -172,8 +173,8 @@ func (t *LineTable) LineToPC(line int, maxpc uint64) uint64 {
 // corresponding to the encoded data.
 // Text must be the start address of the
 // corresponding text segment.
-func NewLineTable(data []byte, text uint64) *LineTable {
-	return &LineTable{Data: data, PC: text, Line: 0, funcNames: make(map[uint32]string), strings: make(map[uint32]string)}
+func NewLineTable(data []byte, text uint64, gofunc uint64) *LineTable {
+	return &LineTable{Data: data, PC: text, GofuncVA: gofunc, Line: 0, funcNames: make(map[uint32]string), strings: make(map[uint32]string)}
 }
 
 // Go 1.2 symbol table format.
@@ -367,6 +368,7 @@ func (t *LineTable) go12Funcs() []Func {
 		f.LineTable = t
 		f.FrameSize = int(info.deferreturn())
 		f.FuncData = info
+		//f.GetInlinedCalls(info.data, t.GofuncVA)
 		syms[i] = Sym{
 			Value:     f.Entry,
 			Type:      'T',
