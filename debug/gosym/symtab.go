@@ -150,6 +150,7 @@ type inlinedCall_v120 struct {
 }
 
 const (
+	MAX_TREE_SIZE 		= 4096
 	size_inlinedCall_v116 = 20
 	size_inlinedCall_v120 = 16 
 	FUNCID_MAX	= 22 // funcID maximum value
@@ -183,12 +184,12 @@ const (
 	FUNCDATA_InlTree 	= 3
 )
 
-func (f *Func) hasInline() (uint32, uint32) {
+func (f *Func) HasInline() (uint32, uint32) {
 	npcdata := int(f.FuncData.Num_pcdata())
 	nfuncdata := int(f.FuncData.Num_funcdata())	
 
 	// check the relevant indices exist	
-	if (npcdata <= PCDATA_InlTreeIndex) || (nfuncdata <= FUNCDATA_InlTree) {
+	if (npcdata < PCDATA_InlTreeIndex) && (nfuncdata < FUNCDATA_InlTree) {
 		return 0, 0
 	}
 
@@ -254,7 +255,6 @@ func isValidPC(data []byte, f *Func) (bool, int32) {
 		return false, -1 
 	}
 	pc_address = uint64(pc) + f.Entry
-	//fmt.Printf("checking pc 0x%x (addr 0x%x) within 0x%x - 0x%x\n", pc, pc_address, f.Entry, f.End)
 	if (pc_address <= f.End ) && (pc_address >= f.Entry) {	
 		return true, pc
 	} 
@@ -283,7 +283,6 @@ func isValidFuncName(data []byte, f *Func) (bool, string) {
 				break
 			}
 			i += 1
-			// TODO -- add check that we're not running off the end of the table
 		} 
 
 		name := string(funcNameTable[nameOff : i ])	
@@ -292,14 +291,15 @@ func isValidFuncName(data []byte, f *Func) (bool, string) {
 	return false, ""
 }
 
-func (f *Func) iterateInline_v116(Gofunc uint64, tree []byte) []InlinedCall {
+func (f *Func) iterateInline_v116(tree []byte) []InlinedCall {
 	var inlineList []InlinedCall
+	fmt.Println("\tinside version116. BAD.")
 	return inlineList
 }
 
-func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
+func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 	var inlineList []InlinedCall
-
+	fmt.Println("\t iterating...")
 	// check there are enough bytes for an inlinedCall struct
 	off := 0
 	// iterate until we hit invalid data 
@@ -322,6 +322,7 @@ func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
 		if !is_valid_fname {
 			break
 		}			
+		fmt.Printf("\t inlined func %s (parent %s)\n", fname, f.Name)
 		// create InlinedCall object
 		inlineList = append(inlineList, InlinedCall {
 				Funcname:		fname,
@@ -337,30 +338,14 @@ func (f *Func) iterateInline_v120(Gofunc uint64, tree []byte) []InlinedCall {
 }
 
 // return array of inlined functions inside f or nil
-func (f *Func) CheckInline(Gofunc uint64, filedata []byte) []InlinedCall {
+func (f *Func) GetInlinedCalls(data []byte) []InlinedCall {
 	
-	// TODO -- check if a) gofunc is always absolute wrt to preferred address
-	// 				 and b) what the preferred load address is
-	baseAddress := uint64(0x400000)
-	Gofunc = Gofunc - baseAddress
-	pcdataInlIndex, funcdataInlTree := f.hasInline()
-	if pcdataInlIndex == 0 && funcdataInlTree == 0 {
-		return nil
-	}
-
-	//fmt.Printf("Gofunc 0x%x, tree 0x%x\n", Gofunc, funcdata_InlTree)
-
-	treeBase := Gofunc + uint64(funcdataInlTree)
-	//fmt.Printf("Total len: 0x%x, treebase: 0x%x\n", len(filedata), treeBase)
-	// TODO -- should be filedata[treeBase : treeEnd]	
-	// .... not sure how to calc end of table?
-	tree := filedata[treeBase:]
-
+	fmt.Println("\tgetting inlined data, version ", f.LineTable.Version)
 	// get size of inlined struct based on version
-	if f.LineTable.Version > ver118 {
-		return f.iterateInline_v120(Gofunc, tree)
+	if f.LineTable.Version >= ver118 {
+		return f.iterateInline_v120(data)
 	} else {
-		return f.iterateInline_v116(Gofunc, tree)
+		return f.iterateInline_v116(data)
 	}
 }
 
