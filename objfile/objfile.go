@@ -267,15 +267,16 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 
 		// the first good one happens to be correct more often than the last
 		candidate.ParsedPclntab = parsedTable
+		
 		// add in inline func resolution
-		for _, fn := range candidate.ParsedPclntab.Funcs {
+		// we do it here for access to the Entry object
+		for i, fn := range candidate.ParsedPclntab.Funcs {
 			// calc inline data VAs
 			pcd_InlIndex, fnd_InlTree := fn.HasInline()
 			if pcd_InlIndex == 0 && fnd_InlTree == 0 {
 				// no inline tree data for this function
 				continue
 			}	
-			fmt.Println("func ", fn.Name)
 
 			// calc where tree starts
 			treeBaseVA := candidate.GofuncVA + uint64(fnd_InlTree)
@@ -288,13 +289,7 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 			}
 			
 			// save results for each function
-			inlineCallList := fn.GetInlinedCalls(treeBytes) 
-			fmt.Printf("\t got %d bytes with %d entries\n", len(treeBytes), len(inlineCallList))
-
-			for _, elt := range inlineCallList {
-				fmt.Println("\tadding inlined ", elt.Funcname)
-				fn.InlinedList = append(fn.InlinedList, elt)
-			}			
+			candidate.ParsedPclntab.Funcs[i].GetInlinedCalls(treeBytes)
 		}
 		finalCandidates = append(finalCandidates, candidate)
 		atLeastOneGood = true
