@@ -368,7 +368,6 @@ func (t *LineTable) go12Funcs() []Func {
 		f.LineTable = t
 		f.FrameSize = int(info.deferreturn())
 		f.FuncData = info
-		//f.GetInlinedCalls(info.data, t.GofuncVA)
 		syms[i] = Sym{
 			Value:     f.Entry,
 			Type:      'T',
