@@ -299,7 +299,7 @@ func (f *Func) iterateInline_v116(tree []byte) []InlinedCall {
 
 func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 	var inlineList []InlinedCall
-	fmt.Println("\t iterating...")
+
 	// check there are enough bytes for an inlinedCall struct
 	off := 0
 	// iterate until we hit invalid data 
@@ -322,7 +322,6 @@ func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 		if !is_valid_fname {
 			break
 		}			
-		fmt.Printf("\t inlined func %s (parent %s)\n", fname, f.Name)
 		// create InlinedCall object
 		inlineList = append(inlineList, InlinedCall {
 				Funcname:		fname,
@@ -338,14 +337,24 @@ func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 }
 
 // return array of inlined functions inside f or nil
-func (f *Func) GetInlinedCalls(data []byte) []InlinedCall {
-	
-	fmt.Println("\tgetting inlined data, version ", f.LineTable.Version)
+func (f *Func) GetInlinedCalls(data []byte) {
+	var inlList []InlinedCall	
+
 	// get size of inlined struct based on version
 	if f.LineTable.Version >= ver118 {
-		return f.iterateInline_v120(data)
+		inlList = f.iterateInline_v120(data)
 	} else {
-		return f.iterateInline_v116(data)
+		inlList = f.iterateInline_v116(data)
+	}
+
+	for _, elt := range inlList {
+		f.InlinedList = append(f.InlinedList, InlinedCall{
+			Funcname: 		elt.Funcname,
+			ParentName:		elt.ParentName,
+			CallingPc:		elt.CallingPc,
+			ParentEntry:	elt.ParentEntry,
+			Data:			elt.Data,
+				})
 	}
 }
 
