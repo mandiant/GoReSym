@@ -272,8 +272,8 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 		// we do it here for access to the Entry object
 		for i, fn := range candidate.ParsedPclntab.Funcs {
 			// calc inline data VAs
-			pcd_InlIndex, fnd_InlTree := fn.HasInline()
-			if pcd_InlIndex == 0 && fnd_InlTree == 0 {
+			fnd_InlTree := fn.HasInline()
+			if fnd_InlTree == 0xffff {
 				// no inline tree data for this function
 				continue
 			}	
