@@ -24,6 +24,10 @@ import (
 	"github.com/mandiant/GoReSym/debug/gosym"
 )
 
+const (
+	MAX_TREE_SIZE = 4096
+)
+
 type StompMagicCandidate struct {
 	PclntabVa             uint64
 	SuspectedModuleDataVa uint64
@@ -33,6 +37,7 @@ type StompMagicCandidate struct {
 type PclntabCandidate struct {
 	SecStart                uint64
 	PclntabVA               uint64
+	GofuncVA		uint64
 	StompMagicCandidateMeta *StompMagicCandidate // some search modes might optimistically try to find moduledata or guess endianess, these hints must match the found moduleData VA later to be considered good candidate
 	Pclntab                 []byte
 	Symtab                  []byte // optional
@@ -129,8 +134,8 @@ func (f *File) Symbols() ([]Sym, error) {
 }
 
 // previously : func (f *File) PCLineTable() (Liner, error) {
-func (f *File) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
-	return f.entries[0].PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
+func (f *File) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64, knownGofuncVA uint64) ([]PclntabCandidate, error) {
+	return f.entries[0].PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase, knownGofuncVA)
 }
 
 func (f *File) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
@@ -211,7 +216,7 @@ func findAllOccurrences(data []byte, searches [][]byte) []int {
 }
 
 // previously: func (e *Entry) PCLineTable() (Liner, error)
-func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64) ([]PclntabCandidate, error) {
+func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, knownGoTextBase uint64, knownGofuncVA uint64) ([]PclntabCandidate, error) {
 	// If the raw file implements Liner directly, use that.
 	// Currently, only Go intermediate objects and archives (goobj) use this path.
 
@@ -251,13 +256,41 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 			continue
 		}
 
-		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart), versionOverride)
+		if knownGofuncVA != 0 {
+			candidate.GofuncVA = knownGofuncVA
+		}
+		
+		parsedTable, err := gosym.NewTable(candidate.Symtab, gosym.NewLineTable(candidate.Pclntab, candidate.SecStart, candidate.GofuncVA), versionOverride)
 		if err != nil || parsedTable.Go12line == nil {
 			continue
 		}
 
 		// the first good one happens to be correct more often than the last
 		candidate.ParsedPclntab = parsedTable
+		
+		// add in inline func resolution
+		// we do it here for access to the Entry object
+		for i, fn := range candidate.ParsedPclntab.Funcs {
+			// calc inline data VAs
+			fnd_InlTree := fn.HasInline()
+			if fnd_InlTree == 0xffff {
+				// no inline tree data for this function
+				continue
+			}	
+
+			// calc where tree starts
+			treeBaseVA := candidate.GofuncVA + uint64(fnd_InlTree)
+
+			// extract relevant bytes
+			treeBytes, err := e.raw.read_memory(treeBaseVA, MAX_TREE_SIZE)
+			if err != nil {
+				fmt.Errorf("failed to get tree bytes for inline function inside %s\n", fn.Name)
+				continue
+			}
+			
+			// save results for each function
+			candidate.ParsedPclntab.Funcs[i].GetInlinedCalls(treeBytes)
+		}
 		finalCandidates = append(finalCandidates, candidate)
 		atLeastOneGood = true
 	}
@@ -351,6 +384,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData121_32
@@ -410,6 +446,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.20":
@@ -466,6 +505,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData120_32
@@ -525,6 +567,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.18":
@@ -581,6 +626,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData118_32
@@ -640,6 +688,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 		case "1.16":
@@ -674,6 +725,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ETypes = uint64(module.Etypes)
 				moduleData.Typelinks = module.Typelinks
 				moduleData.ITablinks = module.Itablinks
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			} else {
 				var module ModuleData116_32
@@ -711,6 +765,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 				moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+				moduleData.Gofunc = uint64(module.Gofunc)
+
 				return secStart, moduleData, err
 			}
 
@@ -817,6 +874,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
 					moduleData.ITablinks = module.Itablinks
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_r17_32
@@ -854,6 +914,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				}
 			case "1.8":
@@ -902,6 +965,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ETypes = uint64(module.Etypes)
 					moduleData.Typelinks = module.Typelinks
 					moduleData.ITablinks = module.Itablinks
+
+					moduleData.Gofunc = uint64(module.Gofunc)
+
 					return secStart, moduleData, err
 				} else {
 					var module ModuleData12_32
@@ -939,6 +1005,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
 					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
 					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
+
+					moduleData.Gofunc = uint64(module.Gofunc)
 					return secStart, moduleData, err
 				}
 			}

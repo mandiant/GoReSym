@@ -17,6 +17,7 @@ import (
 	"github.com/mandiant/GoReSym/buildinfo"
 	"github.com/mandiant/GoReSym/objfile"
 	"github.com/mandiant/GoReSym/runtime/debug"
+	"github.com/mandiant/GoReSym/debug/gosym"
 )
 
 func isStdPackage(pkg string) bool {
@@ -49,6 +50,7 @@ type FuncMetadata struct {
 	End         uint64
 	PackageName string
 	FullName    string
+	InlinedList	[]gosym.InlinedCall
 }
 
 type ExtractMetadata struct {
@@ -187,8 +189,9 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 
 	var knownPclntabVA = uint64(0)
 	var knownGoTextBase = uint64(0)
+	var knownGofuncVA = uint64(0)
 restartParseWithRealTextBase:
-	tabs, err := file.PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
+	tabs, err := file.PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase, knownGofuncVA)
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
 	}
@@ -246,6 +249,7 @@ restartParseWithRealTextBase:
 				// assign real base and restart pclntab parsing with correct VAs!
 				knownGoTextBase = tmpModData.TextVA
 				knownPclntabVA = tab.PclntabVA
+				knownGofuncVA = tmpModData.Gofunc
 				goto restartParseWithRealTextBase
 			}
 
@@ -302,10 +306,10 @@ restartParseWithRealTextBase:
 				End:         elem.End,
 				PackageName: elem.PackageName(),
 				FullName:    elem.Name,
+				InlinedList: elem.InlinedList,
 			})
 		}
 	}
-
 	return extractMetadata, nil
 }
 
