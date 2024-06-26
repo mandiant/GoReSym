@@ -128,69 +128,68 @@ func (s *Sym) BaseName() string {
 	return s.Name
 }
 
-
 // go v1.16-v1.18
 type inlinedCall_v116 struct {
-	parent 	int16
-	funcId	uint8
-	_pad	uint8
-	file	int32
-	line	int32
-	func_	int32
-	parentPc	int32
+	parent   int16
+	funcId   uint8
+	_pad     uint8
+	file     int32
+	line     int32
+	func_    int32
+	parentPc int32
 }
 
 // go v.1.20+
 type inlinedCall_v120 struct {
-	funcId	uint8
-	_pad 	[3]uint8
-	nameOff	int32
-	parentPc	int32
-	startLine	int32
+	funcId    uint8
+	_pad      [3]uint8
+	nameOff   int32
+	parentPc  int32
+	startLine int32
 }
 
 const (
-	MAX_TREE_SIZE 		= 4096
+	MAX_TREE_SIZE         = 4096
 	size_inlinedCall_v116 = 20
-	size_inlinedCall_v120 = 16 
-	FUNCID_MAX	= 22 // funcID maximum value
+	size_inlinedCall_v120 = 16
+	FUNCID_MAX            = 22 // funcID maximum value
 )
 
 // An InlinedCall collects information about a function that has been inlined as well as its parent
 type InlinedCall struct {
-	Funcname	string
-	ParentName	string
-	CallingPc	uint64
-	ParentEntry	uint64
-	Data 		[]byte
+	Funcname    string
+	ParentName  string
+	CallingPc   uint64
+	ParentEntry uint64
+	Data        []byte
 }
 
 // A Func collects information about a single function.
 type Func struct {
 	Entry uint64
 	*Sym
-	End       uint64
-	Params    []*Sym // nil for Go 1.3 and later binaries
-	Locals    []*Sym // nil for Go 1.3 and later binaries
-	FrameSize int
-	LineTable *LineTable
-	FuncData  funcData
+	End         uint64
+	Params      []*Sym // nil for Go 1.3 and later binaries
+	Locals      []*Sym // nil for Go 1.3 and later binaries
+	FrameSize   int
+	LineTable   *LineTable
+	FuncData    funcData
 	InlinedList []InlinedCall
-	Obj       *Obj
+	Obj         *Obj
 }
 
-const ( 
-	PCDATA_InlTreeIndex 	= 2
-	FUNCDATA_InlTree 	= 3
+const (
+	PCDATA_InlTreeIndex = 2
+	FUNCDATA_InlTree    = 3
 )
 
-func (f *Func) HasInline() (uint32, uint32) {
+func (f *Func) HasInline() uint32 {
 	npcdata := int(f.FuncData.Num_pcdata())
-	nfuncdata := int(f.FuncData.Num_funcdata())	
+	nfuncdata := int(f.FuncData.Num_funcdata())
 
-	// check the relevant indices exist	
-	if (npcdata < PCDATA_InlTreeIndex) && (nfuncdata < FUNCDATA_InlTree) {
-		return 0, 0
+	// check the relevant index exists
+	if nfuncdata <= FUNCDATA_InlTree {
+		return 0xffff
 	}
 
 	// get the size of runtime_func actual fields
@@ -199,35 +198,35 @@ func (f *Func) HasInline() (uint32, uint32) {
 		sz0 = 4
 	}
 
-	func_hdr_size 	:= sz0 + (4*10) // sz of first elt + size of remaining elts
-	pcdata_size 	:= 4 * npcdata // elts in pcdata[npcdata] are 4 bytes each
-	funcdata_size 	:= 4 * nfuncdata // ^ditto	
-	
-	func_pseudofields := f.FuncData.data[func_hdr_size:] // chop off actual fields
-	pcdata_raw := func_pseudofields[:pcdata_size] // isolate just the pcdata table bytes
-	funcdata_raw := func_pseudofields[pcdata_size:] // ^ditto for funcdata table bytes
+	// calculate where funcdata array begins
+	func_hdr_size := int(sz0) + (4 * 10) // sz of first elt + size of remaining elts
+	pcdata_size := 4 * npcdata           // elts in pcdata[npcdata] are 4 bytes each
+	funcdata_offset := func_hdr_size + pcdata_size
+
+	// isolate the funcdata array
+	funcdata_size := 4 * nfuncdata
+	funcdata_raw := f.FuncData.data[funcdata_offset:(funcdata_offset + funcdata_size)]
 	if len(funcdata_raw) != funcdata_size {
-		fmt.Errorf("wanted %d bytes for uint32_t funcdata[nfuncdata], got %d\n", funcdata_size, len(funcdata_raw))
-		return 0,0
+		fmt.Printf("wanted %d bytes for uint32_t funcdata[nfuncdata], got %d\n", funcdata_size, len(funcdata_raw))
+		return 0xffff
 	}
 
-	// get the actual inline offsets
-	pcdata_InlIndex := f.LineTable.Binary.Uint32(pcdata_raw[4*PCDATA_InlTreeIndex:])
+	// get the actual inline data value
 	funcdata_InlTree := f.LineTable.Binary.Uint32(funcdata_raw[4*FUNCDATA_InlTree:])
-	
-	// check if these indices are ^uint32(0)
-	if pcdata_InlIndex == ^uint32(0) || funcdata_InlTree == ^uint32(0) {
-		return 0, 0
+
+	// check if the value is valid
+	if funcdata_InlTree == ^uint32(0) {
+		return 0xffff
 	}
-	
-	return pcdata_InlIndex, funcdata_InlTree	
+
+	return funcdata_InlTree
 }
 
 func isValidFuncID(data []byte) bool {
-	
-	// TODO -- currently only accepts "FuncIDNormal" 
-	// 	We may want to include other types. 
-	if data[0] != 0 { 
+
+	// TODO -- currently only accepts "FuncIDNormal"
+	// 	We may want to include other types.
+	if data[0] != 0 {
 		return false
 	}
 
@@ -238,26 +237,26 @@ func isValidFuncID(data []byte) bool {
 		}
 		i += 1
 	}
-	
+
 	return true
 }
 
 // validate that calling PC falls within calling function
 func isValidPC(data []byte, f *Func) (bool, int32) {
-	var pc 			int32
-	var pc_address	uint64
+	var pc int32
+	var pc_address uint64
 
 	// convert bytes to int32
 	// TODO -- see isValidFuncName()
 	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &pc)
 	if err != nil {
 		fmt.Println(err)
-		return false, -1 
+		return false, -1
 	}
 	pc_address = uint64(pc) + f.Entry
-	if (pc_address <= f.End ) && (pc_address >= f.Entry) {	
+	if (pc_address <= f.End) && (pc_address >= f.Entry) {
 		return true, pc
-	} 
+	}
 
 	return false, -1
 }
@@ -265,16 +264,16 @@ func isValidPC(data []byte, f *Func) (bool, int32) {
 // TODO -- pull out binary converter to its own func for reuse
 // TODO -- check for little vs big endian
 func isValidFuncName(data []byte, f *Func) (bool, string) {
-	var nameOff	int32
+	var nameOff int32
 
 	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &nameOff)
 	if err != nil {
 		fmt.Println(err)
 		return false, ""
 	}
-	
+
 	// check that name offset falls within func name table boundaries
-	funcNameTable := f.LineTable.funcnametab 
+	funcNameTable := f.LineTable.funcnametab
 	if nameOff < int32(len(funcNameTable)) {
 		i := nameOff
 		for i < int32(len(funcNameTable)) {
@@ -283,10 +282,10 @@ func isValidFuncName(data []byte, f *Func) (bool, string) {
 				break
 			}
 			i += 1
-		} 
+		}
 
-		name := string(funcNameTable[nameOff : i ])	
-		return true, name 	
+		name := string(funcNameTable[nameOff:i])
+		return true, name
 	}
 	return false, ""
 }
@@ -302,33 +301,33 @@ func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 
 	// check there are enough bytes for an inlinedCall struct
 	off := 0
-	// iterate until we hit invalid data 
+	// iterate until we hit invalid data
 	//	that indicates we've read this function's entire inline tree
-	for (len(tree) - off >= size_inlinedCall_v120) {
+	for len(tree)-off >= size_inlinedCall_v120 {
 		// get elt bytes
-		elt_raw := tree[ off : off+size_inlinedCall_v120]
+		elt_raw := tree[off : off+size_inlinedCall_v120]
 
 		// verify funcId and padding look normal
-		if !isValidFuncID(elt_raw[ : 4]) {
+		if !isValidFuncID(elt_raw[:4]) {
 			break
 		}
 		// verify calling PC exists within parent func bounds
-		is_valid_pc, pc := isValidPC(elt_raw[8:12], f) 
+		is_valid_pc, pc := isValidPC(elt_raw[8:12], f)
 		if !is_valid_pc {
 			break
 		}
-		// resolve name 
+		// resolve name
 		is_valid_fname, fname := isValidFuncName(elt_raw[4:8], f)
 		if !is_valid_fname {
 			break
-		}			
+		}
 		// create InlinedCall object
-		inlineList = append(inlineList, InlinedCall {
-				Funcname:		fname,
-				ParentName:		f.Name,
-				CallingPc:		uint64(pc),
-				ParentEntry:	f.Entry,					
-				Data:			elt_raw,
+		inlineList = append(inlineList, InlinedCall{
+			Funcname:    fname,
+			ParentName:  f.Name,
+			CallingPc:   uint64(pc),
+			ParentEntry: f.Entry,
+			Data:        elt_raw,
 		})
 		// add obj to InlineList
 		off = off + size_inlinedCall_v120
@@ -338,7 +337,7 @@ func (f *Func) iterateInline_v120(tree []byte) []InlinedCall {
 
 // return array of inlined functions inside f or nil
 func (f *Func) GetInlinedCalls(data []byte) {
-	var inlList []InlinedCall	
+	var inlList []InlinedCall
 
 	// get size of inlined struct based on version
 	if f.LineTable.Version >= ver118 {
@@ -349,12 +348,12 @@ func (f *Func) GetInlinedCalls(data []byte) {
 
 	for _, elt := range inlList {
 		f.InlinedList = append(f.InlinedList, InlinedCall{
-			Funcname: 		elt.Funcname,
-			ParentName:		elt.ParentName,
-			CallingPc:		elt.CallingPc,
-			ParentEntry:	elt.ParentEntry,
-			Data:			elt.Data,
-				})
+			Funcname:    elt.Funcname,
+			ParentName:  elt.ParentName,
+			CallingPc:   elt.CallingPc,
+			ParentEntry: elt.ParentEntry,
+			Data:        elt.Data,
+		})
 	}
 }
 
