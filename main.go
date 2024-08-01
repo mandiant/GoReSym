@@ -66,7 +66,7 @@ type ExtractMetadata struct {
 	StdFunctions  []FuncMetadata
 }
 
-func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string, noPrintFunctions bool) (metadata ExtractMetadata, err error) {
 	tmpFile, err := os.CreateTemp(os.TempDir(), "goresym_tmp-")
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to create temporary file: %s", err)
@@ -81,10 +81,10 @@ func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool,
 		return ExtractMetadata{}, fmt.Errorf("failed to close temporary file: %s", err)
 	}
 
-	return main_impl(tmpFile.Name(), printStdPkgs, printFilePaths, printTypes, manualTypeAddress, versionOverride)
+	return main_impl(tmpFile.Name(), printStdPkgs, printFilePaths, printTypes, manualTypeAddress, versionOverride, noPrintFunctions)
 }
 
-func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, manualTypeAddress int, versionOverride string, noPrintFunctions bool) (metadata ExtractMetadata, err error) {
 	extractMetadata := ExtractMetadata{}
 
 	file, err := objfile.Open(fileName)
@@ -286,23 +286,25 @@ restartParseWithRealTextBase:
 		}
 	}
 
-	for _, elem := range finalTab.ParsedPclntab.Funcs {
-		if isStdPackage(elem.PackageName()) {
-			if printStdPkgs {
-				extractMetadata.StdFunctions = append(extractMetadata.StdFunctions, FuncMetadata{
+	if !noPrintFunctions {
+		for _, elem := range finalTab.ParsedPclntab.Funcs {
+			if isStdPackage(elem.PackageName()) {
+				if printStdPkgs {
+					extractMetadata.StdFunctions = append(extractMetadata.StdFunctions, FuncMetadata{
+						Start:       elem.Entry,
+						End:         elem.End,
+						PackageName: elem.PackageName(),
+						FullName:    elem.Name,
+					})
+				}
+			} else {
+				extractMetadata.UserFunctions = append(extractMetadata.UserFunctions, FuncMetadata{
 					Start:       elem.Entry,
 					End:         elem.End,
 					PackageName: elem.PackageName(),
 					FullName:    elem.Name,
 				})
 			}
-		} else {
-			extractMetadata.UserFunctions = append(extractMetadata.UserFunctions, FuncMetadata{
-				Start:       elem.Entry,
-				End:         elem.End,
-				PackageName: elem.PackageName(),
-				FullName:    elem.Name,
-			})
 		}
 	}
 
@@ -425,6 +427,7 @@ func main() {
 	typeAddress := flag.Int("m", 0, "Manually parse the RTYPE at the provided virtual address, disables automated enumeration of moduledata typelinks itablinks")
 	versionOverride := flag.String("v", "", "Override the automated version detection, ex: 1.17. If this is wrong, parsing may fail or produce nonsense")
 	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is omitted for clarity")
+	noPrintFunctions := flag.Bool("no-functions", false, "Do not print user and standard function sections")
 	flag.Parse()
 
 	if *about {
@@ -442,7 +445,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	metadata, err := main_impl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *typeAddress, *versionOverride)
+	metadata, err := main_impl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *typeAddress, *versionOverride, *noPrintFunctions)
 	if err != nil {
 		fmt.Println(TextToJson("error", fmt.Sprintf("Failed to parse file: %s", err)))
 		os.Exit(1)

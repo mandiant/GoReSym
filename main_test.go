@@ -30,7 +30,7 @@ func TestAllVersions(t *testing.T) {
 			}
 
 			t.Run(versionPath, func(t *testing.T) {
-				data, err := main_impl(filePath, true, true, true, 0, "")
+				data, err := main_impl(filePath, true, true, true, 0, "", true)
 				if err != nil {
 					t.Errorf("Go %s failed on %s: %s", v, file, err)
 				}
@@ -119,7 +119,7 @@ func testSymbolRecovery(t *testing.T, workingDirectory string, binaryName string
 		return
 	}
 
-	data, err := main_impl(filePath, true, true, true, 0, "")
+	data, err := main_impl(filePath, true, true, true, 0, "", true)
 	if err != nil {
 		t.Errorf("GoReSym failed: %s", err)
 	}
@@ -214,7 +214,7 @@ func TestWeirdBins(t *testing.T) {
 			return
 		}
 
-		_, err := main_impl(filePath, true, true, true, 0, "")
+		_, err := main_impl(filePath, true, true, true, 0, "", true)
 		if err == nil {
 			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
 		}
@@ -228,7 +228,7 @@ func TestWeirdBins(t *testing.T) {
 			return
 		}
 
-		_, err := main_impl(filePath, true, true, true, 0, "")
+		_, err := main_impl(filePath, true, true, true, 0, "", true)
 		if err == nil {
 			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
 		}
