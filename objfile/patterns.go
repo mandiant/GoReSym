@@ -60,8 +60,20 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 	pattern = strings.ToLower(pattern)
 
 	patLen := 0
+	sequenceLen := 0
+	needleOffset := 0
 	needle := make([]byte, 0)
 	tmpNeedle := make([]byte, 0)
+
+	resetNeedle := func() {
+		patLen += sequenceLen
+		sequenceLen = 0
+		if len(tmpNeedle) > len(needle) {
+			needle = slices.Clone(tmpNeedle)
+			needleOffset = patLen - len(tmpNeedle)
+		}
+		tmpNeedle = make([]byte, 0)
+	}
 
 	var regex_pattern string
 	for i := 0; i < len(pattern); {
@@ -82,13 +94,8 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			regex_pattern += "."
 
 			i += 2
-			patLen += 1
-			if len(tmpNeedle) > len(needle) {
-				needle = slices.Clone(tmpNeedle)
-				tmpNeedle = make([]byte, 0)
-			} else {
-				tmpNeedle = make([]byte, 0)
-			}
+			resetNeedle()
+			sequenceLen = 1
 			continue
 		}
 
@@ -106,12 +113,12 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 				return nil, errors.New("[] didn't contain a dash")
 			}
 
-			_, err := strconv.Atoi(low)
+			lowInt, err := strconv.Atoi(low)
 			if err != nil {
 				return nil, errors.New("invalid number")
 			}
 
-			_, err = strconv.Atoi(high)
+			highInt, err := strconv.Atoi(high)
 			if err != nil {
 				return nil, errors.New("invalid number")
 			}
@@ -123,15 +130,16 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			regex_pattern += high
 			regex_pattern += "}"
 
-			i += end + 1
-			patLen += 1
+			// YARA evaluates lazily, make sure we match that:
+			// AA BB BB
+			// { AA [0-1] BB }
+			// must produce:
+			// AA BB
+			regex_pattern += "?"
 
-			if len(tmpNeedle) > len(needle) {
-				needle = slices.Clone(tmpNeedle)
-				tmpNeedle = make([]byte, 0)
-			} else {
-				tmpNeedle = make([]byte, 0)
-			}
+			i += end + 1
+			resetNeedle()
+			sequenceLen = highInt - lowInt + 1
 			continue
 		}
 
@@ -161,13 +169,8 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			regex_pattern += ")"
 
 			i += end + 1
-			patLen += len(choices)
-			if len(tmpNeedle) > len(needle) {
-				needle = slices.Clone(tmpNeedle)
-				tmpNeedle = make([]byte, 0)
-			} else {
-				tmpNeedle = make([]byte, 0)
-			}
+			resetNeedle()
+			sequenceLen = 1
 			continue
 		}
 
@@ -185,13 +188,8 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			regex_pattern += "]"
 
 			i += 2
-			patLen += 1
-			if len(tmpNeedle) > len(needle) {
-				needle = slices.Clone(tmpNeedle)
-				tmpNeedle = make([]byte, 0)
-			} else {
-				tmpNeedle = make([]byte, 0)
-			}
+			resetNeedle()
+			sequenceLen = 1
 			continue
 		}
 
@@ -205,36 +203,33 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			}
 			tmpNeedle = append(tmpNeedle, byte(byt))
 			i += 2
-			patLen += 1
+			sequenceLen += 1
 			continue
 		}
 
 		return nil, errors.New("unexpected value")
 	}
 
-	if len(tmpNeedle) > len(needle) {
-		needle = slices.Clone(tmpNeedle)
-		//tmpNeedle = make([]byte, 0) not needed at exit
-	}
+	resetNeedle()
 
-	r := binaryregexp.MustCompile(regex_pattern)
-	if r == nil {
+	// use "single line" flag to match "\n" as regular character
+	r, err := binaryregexp.Compile("(?s)" + regex_pattern)
+	if err != nil {
 		return nil, errors.New("failed to compile regex")
 	}
-	return &RegexAndNeedle{patLen, regex_pattern, r, needle}, nil
+	return &RegexAndNeedle{patLen, regex_pattern, r, needleOffset, needle}, nil
 }
 
 func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 	data_len := len(data)
 	matches := make([]int, 0)
 
-	// use an optimized memscan to find some candidates chunks from the much large haystack
+	// use an optimized memscan to find some candidates chunks from the much larger haystack
 	needleMatches := findAllOccurrences(data, [][]byte{regexInfo.needle})
 	for _, needleMatch := range needleMatches {
-		// we might have found a needle beginning at the very end of our regex
-		// widen the window to regex scan from the [-regexLen:regexLen] so we scan the front too
-		data_start := needleMatch - regexInfo.len
-		data_end := needleMatch + regexInfo.len
+		// adjust the window to the pattern start and end
+		data_start := needleMatch - regexInfo.needleOffset
+		data_end := needleMatch + regexInfo.len - regexInfo.needleOffset
 		if data_start >= data_len {
 			continue
 		} else if data_start <= 0 {
@@ -250,16 +245,35 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 			// the match offset is the start index of the chunk + reMatch index
 			start := reMatch[0] + data_start
 
-			//end := reMatch[1]
+			//end := reMatch[1] + data_start
 			matches = append(matches, start)
+
+			// special case to handle sub-matches, which are skipped by regex but matched by YARA:
+			// AA AA BB CC
+			// { AA [0-1] BB CC }
+			// must produce:
+			// AA AA BB CC
+			// AA BB CC
+			subStart := start + 1
+			for {
+				subMatches := regexInfo.re.FindAllIndex(data[subStart:data_end], -1)
+				if len(subMatches) == 0 {
+					break
+				}
+				for _, match := range subMatches {
+					matches = append(matches, match[0]+subStart)
+				}
+				subStart += subMatches[0][0] + 1
+			}
 		}
 	}
 	return matches
 }
 
 type RegexAndNeedle struct {
-	len    int
-	rawre  string
-	re     *binaryregexp.Regexp
-	needle []byte // longest fixed sub-sequence of regex
+	len          int
+	rawre        string
+	re           *binaryregexp.Regexp
+	needleOffset int    // offset within the pattern
+	needle       []byte // longest fixed sub-sequence of regex
 }
