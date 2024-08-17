@@ -288,12 +288,12 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) [][]int {
 		data_end := needleMatch + regexInfo.len - regexInfo.needleOffset
 		if data_start >= data_len {
 			continue
-		} else if data_start <= 0 {
+		}
+		if data_start < 0 {
 			data_start = 0
 		}
-
-		if data_end >= data_len {
-			data_end = data_len - 1
+		if data_end > data_len {
+			data_end = data_len
 		}
 
 		// don't repeat previously scanned chunks
