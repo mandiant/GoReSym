@@ -207,6 +207,24 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			continue
 		}
 
+		// input: ~AB
+		// output: [^\xAB]
+		if c == "~" {
+			if len(pattern) < i+3 {
+				return nil, errors.New("incomplete negated byte")
+			}
+			e := pattern[i+2 : i+3]
+
+			regex_pattern += "[^"
+			regex_pattern += `\x` + strings.ToUpper(d+e)
+			regex_pattern += "]"
+
+			i += 3
+			resetNeedle()
+			sequenceLen = 1
+			continue
+		}
+
 		return nil, errors.New("unexpected value")
 	}
 
