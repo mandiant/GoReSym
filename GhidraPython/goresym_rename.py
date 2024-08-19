@@ -54,7 +54,7 @@ def _entry_addr_estimator(hints):
 
     func = max(candidates, key=lambda f: len(f["FullName"]))
 
-    fm = currentProgram().getFunctionManager()
+    fm = getCurrentProgram().getFunctionManager()
     for f in fm.getFunctions(True):
         if f.getName() == "entry":
             return f.getEntryPoint().getOffset()-func["Start"]
@@ -63,7 +63,7 @@ def _entry_addr_estimator(hints):
 
 def _pclntab_estimator(hints):
     # Expected pclntab name per exec format
-    exec_fmt = currentProgram().getMetadata()["Executable Format"]
+    exec_fmt = getCurrentProgram().getMetadata()["Executable Format"]
     pclntabs = []
     block_name = ".text"
     if exec_fmt == "Executable and Linking Format (ELF)":
@@ -85,11 +85,11 @@ def _pclntab_estimator(hints):
         
     # Check if pclntab is present
     for p in pclntabs:
-        pclntab = currentProgram().getMemory().getBlock(p)
+        pclntab = getCurrentProgram().getMemory().getBlock(p)
         if pclntab is not None:
             # With pclntab, offset should be a matter of TabMeta VA
             tmva = hints["TabMeta"]["VA"]
-            text = currentProgram().getMemory().getBlock(block_name)
+            text = getCurrentProgram().getMemory().getBlock(block_name)
             return text.getStart().getOffset()-tmva
 
     return None
@@ -101,7 +101,7 @@ def _func_map_estimator(hints):
     grs_funcs = {f["FullName"]: f for f in hfuncs}
 
     # Match function lists and collect possible offsets
-    fm = currentProgram().getFunctionManager()
+    fm = getCurrentProgram().getFunctionManager()
     for f in fm.getFunctions(True):
         name = f.getName()
         if "FUN_" in name or name == "entry":
@@ -140,7 +140,7 @@ def rename_funcs(items, offset, simulate=False):
     if not iterable(items):
         return 0, 0
 
-    fm = currentProgram().getFunctionManager()
+    fm = getCurrentProgram().getFunctionManager()
     rename_counter, create_counter = 0, 0
     for func in items:
         try:
