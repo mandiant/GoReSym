@@ -247,7 +247,7 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 	for _, needleMatch := range needleMatches {
 		// adjust the window to the pattern start and end
 		data_start := needleMatch - regexInfo.needleOffset
-		data_end := needleMatch + regexInfo.len - regexInfo.needleOffset
+		data_end := data_start + regexInfo.len
 		if data_start >= data_len {
 			continue
 		}
