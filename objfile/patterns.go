@@ -113,7 +113,7 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 				return nil, errors.New("[] didn't contain a dash")
 			}
 
-			lowInt, err := strconv.Atoi(low)
+			_, err := strconv.Atoi(low)
 			if err != nil {
 				return nil, errors.New("invalid number")
 			}
@@ -139,7 +139,7 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 
 			i += end + 1
 			resetNeedle()
-			sequenceLen = highInt - lowInt + 1
+			sequenceLen = highInt // pessimistic length
 			continue
 		}
 

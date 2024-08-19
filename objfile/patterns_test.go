@@ -150,6 +150,14 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 			t.Errorf("incorrect pattern")
 		}
 
+		if reg.len != 72 {
+			t.Errorf("incorrect pattern length")
+		}
+
+		if reg.needleOffset != 61 {
+			t.Errorf("incorrect needle offset")
+		}
+
 		if !bytes.Equal(reg.needle, []byte{0x01, 0x00, 0x00, 0x8B}) {
 			t.Errorf("incorrect needle")
 		}
@@ -167,8 +175,16 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 			t.Errorf("incorrect pattern")
 		}
 
+		if reg.len != 20 {
+			t.Errorf("incorrect reg length")
+		}
+
 		if !bytes.Equal(reg.needle, []byte{0x41, 0xF9}) {
 			t.Errorf("incorrect needle")
+		}
+
+		if reg.needleOffset != 14 {
+			t.Errorf("incorrect needle offset")
 		}
 	})
 
@@ -180,6 +196,16 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 
 		if !bytes.Equal(reg.needle, []byte{0xBB, 0xCC}) {
 			t.Errorf("incorrect needle")
+		}
+
+		if reg.needleOffset != 2 {
+			// needle offset is pessimistic, AA ?? ?? == 3, we choose the range max
+			t.Errorf("incorrect needle offset")
+		}
+
+		if reg.len != 4 {
+			// length is also pessimistic
+			t.Errorf("incorrect pattern length")
 		}
 
 		matches := FindRegex([]byte{0xAA, 0xAA, 0xBB, 0xCC}, reg)
@@ -210,9 +236,33 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 			t.Errorf("pattern errored")
 		}
 
+		if !bytes.Equal(reg.needle, []byte{0xAA, 0xBB, 0xCC}) {
+			t.Errorf("incorrect needle")
+		}
+
 		matches := FindRegex([]byte{0x0A, 0xAA, 0xBB, 0xCC, 0x0A, 0xAA, 0xBB, 0x00, 0xAA, 0xBB, 0xCC, 0x0A}, reg)
 		if len(matches) != 2 {
 			t.Errorf("Wrong match count")
+		}
+	})
+
+	t.Run("RangePatLength", func(t *testing.T) {
+		reg, err := RegexpPatternFromYaraPattern("{ ?? [0-50] 8B [8-12] AA (AA|CC|DD) }")
+
+		if err != nil {
+			t.Errorf("pattern errored")
+		}
+
+		if reg.len != 66 {
+			t.Errorf("incorrect pattern length")
+		}
+
+		if reg.needleOffset != 51 {
+			t.Errorf("incorrect needle offset")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{0x8B}) {
+			t.Errorf("incorrect needle")
 		}
 	})
 }
