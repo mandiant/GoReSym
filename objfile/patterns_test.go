@@ -146,7 +146,7 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 		}
 
 		// manually translated
-		if reg.rawre != `\x8D.....\xEB..{0,50}\x8B..\x01\x00\x00\x8B...\x85.\x75.` {
+		if reg.rawre != `\x8D.....\xEB..{0,50}?\x8B..\x01\x00\x00\x8B...\x85.\x75.` {
 			t.Errorf("incorrect pattern")
 		}
 

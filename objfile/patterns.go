@@ -207,6 +207,24 @@ func RegexpPatternFromYaraPattern(pattern string) (*RegexAndNeedle, error) {
 			continue
 		}
 
+		// input: ~AB
+		// output: [^\xAB]
+		if c == "~" {
+			if len(pattern) < i+3 {
+				return nil, errors.New("incomplete negated byte")
+			}
+			e := pattern[i+2 : i+3]
+
+			regex_pattern += "[^"
+			regex_pattern += `\x` + strings.ToUpper(d+e)
+			regex_pattern += "]"
+
+			i += 3
+			resetNeedle()
+			sequenceLen = 1
+			continue
+		}
+
 		return nil, errors.New("unexpected value")
 	}
 
@@ -229,15 +247,15 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 	for _, needleMatch := range needleMatches {
 		// adjust the window to the pattern start and end
 		data_start := needleMatch - regexInfo.needleOffset
-		data_end := needleMatch + regexInfo.len - regexInfo.needleOffset
+		data_end := data_start + regexInfo.len
 		if data_start >= data_len {
 			continue
-		} else if data_start <= 0 {
+		}
+		if data_start < 0 {
 			data_start = 0
 		}
-
-		if data_end >= data_len {
-			data_end = data_len - 1
+		if data_end > data_len {
+			data_end = data_len
 		}
 
 		// do the full regex scan on a very small chunk
