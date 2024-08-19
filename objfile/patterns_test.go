@@ -171,4 +171,48 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 			t.Errorf("incorrect needle")
 		}
 	})
+
+	t.Run("AllSubMatches", func(t *testing.T) {
+		reg, err := RegexpPatternFromYaraPattern("{ AA [0-1] BB CC }")
+		if err != nil {
+			t.Errorf("pattern errored")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{0xBB, 0xCC}) {
+			t.Errorf("incorrect needle")
+		}
+
+		matches := FindRegex([]byte{0xAA, 0xAA, 0xBB, 0xCC}, reg)
+		if len(matches) != 2 {
+			t.Errorf("Wrong sub match count")
+		}
+
+		matches2 := FindRegex([]byte{0xAA, 0xBB, 0xCC}, reg)
+		if len(matches2) != 1 {
+			t.Errorf("Wrong sub match count")
+		}
+
+		matches3 := FindRegex([]byte{0x00, 0x00, 0x11, 0xAA, 0xBB, 0xCC, 0xAA, 0xAA, 0xBB, 0xCC}, reg)
+		if len(matches3) != 3 {
+			t.Errorf("Wrong sub match count")
+		}
+
+		matches4 := FindRegex([]byte{0xFF, 0xAA, 0xFF, 0xBB, 0xCC, 0x00, 0x00, 0x11, 0xAA, 0xBB, 0xCC, 0xAA, 0xAA, 0xBB, 0xCC}, reg)
+		if len(matches4) != 4 {
+			t.Errorf("Wrong sub match count")
+		}
+	})
+
+	t.Run("NewLineByte", func(t *testing.T) {
+		// ensure ?? (dot) matches \n (0x0A)
+		reg, err := RegexpPatternFromYaraPattern("{ ?? AA BB CC }")
+		if err != nil {
+			t.Errorf("pattern errored")
+		}
+
+		matches := FindRegex([]byte{0x0A, 0xAA, 0xBB, 0xCC, 0x0A, 0xAA, 0xBB, 0x00, 0xAA, 0xBB, 0xCC, 0x0A}, reg)
+		if len(matches) != 2 {
+			t.Errorf("Wrong match count")
+		}
+	})
 }

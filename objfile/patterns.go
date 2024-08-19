@@ -278,6 +278,7 @@ func FindRegex(data []byte, regexInfo *RegexAndNeedle) []int {
 				if len(subMatches) == 0 {
 					break
 				}
+
 				for _, match := range subMatches {
 					matches = append(matches, match[0]+subStart)
 				}
