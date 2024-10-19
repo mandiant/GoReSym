@@ -2,6 +2,7 @@ package objfile
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"rsc.io/binaryregexp"
@@ -263,6 +264,31 @@ func TestRegexpPatternFromYaraPattern(t *testing.T) {
 
 		if !bytes.Equal(reg.needle, []byte{0x8B}) {
 			t.Errorf("incorrect needle")
+		}
+	})
+
+	t.Run("Repeat", func(t *testing.T) {
+		reg, err := RegexpPatternFromYaraPattern("{ AA [0-512] BB }")
+
+		if err != nil {
+			t.Errorf("pattern errored")
+		}
+
+		if reg.len != 514 {
+			t.Errorf("incorrect pattern length")
+		}
+
+		if reg.needleOffset != 0 {
+			t.Errorf("incorrect needle offset")
+		}
+
+		if !bytes.Equal(reg.needle, []byte{0xAA}) {
+			t.Errorf("incorrect needle")
+		}
+
+		results := FindRegex([]byte{0xAA, 0xAA, 0xAA, 0xBB, 0xAA, 0xAA, 0xBB, 0xAA, 0xBB, 0xCC}, reg)
+		if !reflect.DeepEqual(results, [][]int{{0, 4}, {1, 4}, {2, 4}, {4, 7}, {5, 7}, {7, 9}}) {
+			t.Errorf("incorrect match indexes")
 		}
 	})
 }
