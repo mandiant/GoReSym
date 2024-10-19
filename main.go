@@ -187,19 +187,16 @@ func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTyp
 
 	var knownPclntabVA = uint64(0)
 	var knownGoTextBase = uint64(0)
+
 restartParseWithRealTextBase:
-	tabs, err := file.PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
+	ch_tabs, err := file.PCLineTable(versionOverride, knownPclntabVA, knownGoTextBase)
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to read pclntab: %w", err)
 	}
 
-	if len(tabs) == 0 {
-		return ExtractMetadata{}, fmt.Errorf("no pclntab candidates found")
-	}
-
 	var moduleData *objfile.ModuleData = nil
-	var finalTab *objfile.PclntabCandidate = &tabs[0]
-	for _, tab := range tabs {
+	var finalTab *objfile.PclntabCandidate = nil
+	for tab := range ch_tabs {
 		if len(versionOverride) > 0 {
 			extractMetadata.Version = versionOverride
 		}
@@ -256,9 +253,13 @@ restartParseWithRealTextBase:
 		}
 	}
 
+	if finalTab == nil {
+		return ExtractMetadata{}, fmt.Errorf("no valid pclntab found")
+	}
+
 	// to be sure we got the right pclntab we had to have found a moduledat as well. If we didn't, then we failed to find the pclntab (correctly) as well
 	if moduleData == nil {
-		return ExtractMetadata{}, fmt.Errorf("no valid pclntab or moduledata found")
+		return ExtractMetadata{}, fmt.Errorf("no valid moduledata found")
 	}
 
 	extractMetadata.ModuleMeta = *moduleData
