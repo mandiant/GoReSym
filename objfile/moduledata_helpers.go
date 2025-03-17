@@ -6,9 +6,9 @@ import (
 
 // readModuleDataField reads a field from the moduledata struct
 func (e *Entry) readModuleDataField(moduleDataAddr uint64, version string, field string, is64bit bool, littleendian bool) (uint64, error) {
-    arch := "386"
+    arch := "x86"  // Changed from "386"
     if is64bit {
-        arch = "amd64"
+        arch = "x64"  // Changed from "amd64"
     }
     
     offset, ok := GetModuleDataOffset(version, arch, field)
