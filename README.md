@@ -1,4 +1,6 @@
 # GoReSym
+![GoReSym Logo](./goresym_scaled.png)
+
 GoReSym is a Go symbol parser that extracts program metadata (such as CPU architecture, OS, endianness, compiler version, etc), function metadata (start & end addresses, names, sources), filename and line number metadata, and embedded structures and types. This cross platform program is based directly on the [open source Go compiler](https://github.com/golang/go/tree/master/src/debug/gosym) and runtime code. 
 
 The upstream Go runtime code is extended to handle:
