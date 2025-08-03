@@ -287,6 +287,10 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		// there's really only 3 main versions for these internal runtime changes 1.2 (<= 1.15), 1.16 (<= 1.17), 1.18 (>= 1.18)
 		// this routine needs the pclntab version, NOT the go runtime version (ex: go 1.15 generates 1.2 style tables)
 		switch version {
+		case "1.24":
+			fallthrough
+		case "1.23":
+			fallthrough
 		case "1.22":
 			fallthrough
 		case "1.21":
@@ -1053,6 +1057,10 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.21":
 		fallthrough
 	case "1.22":
+		fallthrough
+	case "1.23":
+		fallthrough
+	case "1.24":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -1296,12 +1304,6 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 	case "1.18":
 		fallthrough
 	case "1.19":
-		fallthrough
-	case "1.20":
-		fallthrough
-	case "1.21":
-		fallthrough
-	case "1.22":
 		if is64bit {
 			var rtype Rtype114_115_116_117_118_64
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
@@ -1320,6 +1322,48 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
 		} else {
 			var rtype Rtype114_115_116_117_118_32
+			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to read type address")
+			}
+			err = rtype.parse(rtype_raw, littleendian)
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to parse type")
+			}
+			name_ptr := moduleData.Types + uint64(rtype.Str)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to read type name")
+			}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+		}
+	case "1.20":
+		fallthrough
+	case "1.21":
+		fallthrough
+	case "1.22":
+		fallthrough
+	case "1.23":
+		fallthrough
+	case "1.24":
+		if is64bit {
+			var rtype ABIType64
+			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to read type address")
+			}
+			err = rtype.parse(rtype_raw, littleendian)
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to parse type")
+			}
+			name_ptr := moduleData.Types + uint64(rtype.Str)
+			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
+			if err != nil {
+				return parsedTypesIn, fmt.Errorf("Failed to read type name")
+			}
+			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
+		} else {
+			var rtype ABIType32
 			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
 			if err != nil {
 				return parsedTypesIn, fmt.Errorf("Failed to read type address")
@@ -1633,6 +1677,10 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.21":
 			fallthrough
 		case "1.22":
+			fallthrough
+		case "1.23":
+			fallthrough
+		case "1.24":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1798,6 +1846,10 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.21":
 			fallthrough
 		case "1.22":
+			fallthrough
+		case "1.23":
+			fallthrough
+		case "1.24":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer

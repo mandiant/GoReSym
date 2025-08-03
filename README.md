@@ -90,7 +90,7 @@ As the Go compiler and runtime have changed, so have the embedded metadata struc
 
 The `moduledata` table used to extract types doesn't exist prior to Go 1.5, so this library will never support extracting types from very old Go versions.
 
-This library current handles the `pclntab` layouts pre 1.2, 1.2, 1.16, 1.18, and 1.20. Note that the pclntab version is always <= the Go runtime version (ex: Go runtime 1.19 uses the 1.18 pclntab layout), we aim to _always support the latest runtime versions_.
+This library current handles the `pclntab` layouts pre 1.2, 1.2, 1.16, 1.18, and 1.20. Note that the pclntab version is always <= the Go runtime version (ex: Go runtime 1.19 uses the 1.18 pclntab layout), we aim to _always support the latest runtime versions_, including Go 1.24.
 
 # Contributions
 Much of the source code from GoReSym is copied from the upstream Go compiler source directory  `/internal`. To make this work, we've had to massage the source a bit. If you want to contribute to GoReSym, read on so we can explain this import process.
@@ -113,6 +113,7 @@ Ignoring some trivial changes, most new logic exists in `/objfile`. For example,
 * `buildID` Legacy bug: [golang/go#50809](https://github.com/golang/go/issues/50809)
 
 # Changes
+*   Added parsing support for Go 1.24 binaries while retaining compatibility with older 1.2 layouts.
 *   GoReSym will now also attempt to find the pclntab based on a signature of the `runtime_modulesinit` initialization method and attempt to repair the pclntab magic (in cases where the pclntab magic has been modified).
 *   Extended `pcln()` functions in `objfile/<fileformat>` to support byte scanning the `pclntab` magic
 *   Added routines such as `DataAfterSection` to support signature scan in file format parsers in `/debug/<fileformat>`

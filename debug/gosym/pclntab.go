@@ -264,7 +264,12 @@ func (t *LineTable) parsePclnTab(versionOverride string) {
 	t.Version = possibleVersion
 
 	if len(versionOverride) > 0 {
-		if strings.Contains(versionOverride, "1.20") {
+		if strings.Contains(versionOverride, "1.24") ||
+			strings.Contains(versionOverride, "1.23") ||
+			strings.Contains(versionOverride, "1.22") ||
+			strings.Contains(versionOverride, "1.21") {
+			t.Version = ver120 // Go 1.21+ shares the 1.20 pclntab layout.
+		} else if strings.Contains(versionOverride, "1.20") {
 			t.Version = ver120
 		} else if strings.Contains(versionOverride, "1.19") {
 			t.Version = ver118
