@@ -441,7 +441,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if flag.NArg() == 1 {
+	if flag.NArg() != 1 {
 		fmt.Println(TextToJson("error", "filepath must be provided as first argument"))
 		os.Exit(1)
 	}

@@ -284,8 +284,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			continue
 		}
 
-		// there's really only 3 main versions for these internal runtime changes 1.2 (<= 1.15), 1.16 (<= 1.17), 1.18 (>= 1.18)
-		// this routine needs the pclntab version, NOT the go runtime version (ex: go 1.15 generates 1.2 style tables)
+		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
+		// with some higher versions using the same layout as versions before it.
 		switch version {
 		case "1.24":
 			fallthrough
@@ -523,6 +523,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
 				return secStart, moduleData, err
 			}
+		case "1.19":
+			fallthrough
 		case "1.18":
 			if is64bit {
 				var module ModuleData118_64
@@ -638,6 +640,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
 				return secStart, moduleData, err
 			}
+		case "1.17":
+			fallthrough
 		case "1.16":
 			if is64bit {
 				var module ModuleData116_64
