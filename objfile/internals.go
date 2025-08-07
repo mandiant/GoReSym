@@ -1364,3 +1364,59 @@ func textAddr32(off32 uint64, text uint64, textsectmap []Textsect_32) uint64 {
 	}
 	return uint64(res)
 }
+
+// ABIType{64,32} mirror internal/abi.Type for Go 1.20+ (incl. Go 1.24).
+
+// ABIType64 mirrors internal/abi.Type for Go 1.20+.
+// Newer runtimes store type descriptors in this format and rtype is
+// simply a pointer to this structure.
+type ABIType64 struct {
+	Size       size_t64
+	Ptrdata    size_t64
+	Hash       uint32
+	Tflag      tflag
+	Align      uint8
+	FieldAlign uint8
+	Kind       Kind
+	Equal      pvoid64
+	Gcdata     pvoid64
+	Str        nameOff
+	PtrToThis  typeOff
+}
+
+func (t *ABIType64) parse(rawData []byte, littleEndian bool) error {
+	srcBytes := bytes.NewBuffer(rawData)
+	var byteOrder binary.ByteOrder
+	if littleEndian {
+		byteOrder = binary.LittleEndian
+	} else {
+		byteOrder = binary.BigEndian
+	}
+	return binary.Read(srcBytes, byteOrder, t)
+}
+
+// ABIType32 mirrors internal/abi.Type on 32-bit architectures.
+type ABIType32 struct {
+	Size       size_t32
+	Ptrdata    size_t32
+	Hash       uint32
+	Tflag      tflag
+	Align      uint8
+	FieldAlign uint8
+	Kind       Kind
+	Equal      pvoid32
+	Gcdata     pvoid32
+	Str        nameOff
+	PtrToThis  typeOff
+}
+
+func (t *ABIType32) parse(rawData []byte, littleEndian bool) error {
+	srcBytes := bytes.NewBuffer(rawData)
+	var byteOrder binary.ByteOrder
+	if littleEndian {
+		byteOrder = binary.LittleEndian
+	} else {
+		byteOrder = binary.BigEndian
+	}
+	return binary.Read(srcBytes, byteOrder, t)
+}
