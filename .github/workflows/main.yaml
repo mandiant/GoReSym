@@ -5,10 +5,12 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
-    - uses: actions/setup-go@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+    - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # 5.5.0
       with:
         go-version: '>=1.21.0'
     - run: go version
@@ -31,17 +33,18 @@ jobs:
         Compress-Archive -DestinationPath GoReSym-mac.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
         Remove-Item ./GoReSym
     - name: Release Windows
-      uses: softprops/action-gh-release@v0.1.12
+      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: GoReSym-windows.zip
     - name: Release Linux
-      uses: softprops/action-gh-release@v0.1.12
+      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: GoReSym-linux.zip
     - name: Release Mac
-      uses: softprops/action-gh-release@v0.1.12
+      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: GoReSym-mac.zip
+
