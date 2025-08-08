@@ -9,47 +9,36 @@ jobs:
       contents: write
     steps:
     - name: Checkout
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.1.1
     - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # 5.5.0
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.0.0
       with:
         go-version: '>=1.21.0'
     - name: Display Go version
       run: go version
-    - name: Get the version tag
-      id: get-tag
-      if: startsWith(github.ref, 'refs/tags/')
-      run: echo "tag=${GITHUB_REF##*/}" >> $env:GITHUB_OUTPUT
     - name: Windows Build
       run: |
         $Env:GOOS='windows'
-        go build -ldflags="-X main.Version=${{ steps.get-tag.outputs.tag }}" -o GoReSym.exe
+        go build -ldflags="-X main.Version=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name }}" -o GoReSym.exe
         Compress-Archive -DestinationPath GoReSym-windows.zip -LiteralPath ./GoReSym.exe -CompressionLevel Fastest
         Remove-Item ./GoReSym.exe
     - name: Linux Build
       run: |
         $Env:GOOS='linux'
-        go build -ldflags="-X main.Version=${{ steps.get-tag.outputs.tag }}" -o GoReSym
+        go build -ldflags="-X main.Version=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name }}" -o GoReSym
         Compress-Archive -DestinationPath GoReSym-linux.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
         Remove-Item ./GoReSym
     - name: Mac Build
       run: |
         $Env:GOOS='darwin'
-        go build -ldflags="-X main.Version=${{ steps.get-tag.outputs.tag }}" -o GoReSym
+        go build -ldflags="-X main.Version=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name }}" -o GoReSym
         Compress-Archive -DestinationPath GoReSym-mac.zip -LiteralPath ./GoReSym -CompressionLevel Fastest
         Remove-Item ./GoReSym
-    - name: Release Windows
-      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
+    - name: Release
+      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.0.4
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: GoReSym-windows.zip
-    - name: Release Linux
-      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: GoReSym-linux.zip
-    - name: Release Mac
-      uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # 2.3.2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: GoReSym-mac.zip
+        files: |
+          GoReSym-windows.zip
+          GoReSym-linux.zip
+          GoReSym-mac.zip

@@ -434,7 +434,7 @@ func main() {
 	flag.Parse()
 
 	if *about {
-		fmt.Printf("Version: %s", Version)
+		fmt.Printf("Version: %s\n", Version)
 		fmt.Println("GoReSym is a Golang symbol recovery tool by Google's Mandiant FLARE team. Maintained by Stephen Eckels.")
 		fmt.Println("LICENSE MIT: https://github.com/mandiant/GoReSym/blob/master/LICENSE")
 		fmt.Println("Dependencies:")
