@@ -414,6 +414,8 @@ func TextToJson(key string, text string) string {
 	return fmt.Sprintf("{\"%s\": \"%s\"}", key, text)
 }
 
+var Version = "dev-local-build"
+
 func main() {
 	stdout := bufio.NewWriter(os.Stdout)
 	defer stdout.Flush()
@@ -432,6 +434,7 @@ func main() {
 	flag.Parse()
 
 	if *about {
+		fmt.Printf("Version: %s", Version)
 		fmt.Println("GoReSym is a Golang symbol recovery tool by Google's Mandiant FLARE team. Maintained by Stephen Eckels.")
 		fmt.Println("LICENSE MIT: https://github.com/mandiant/GoReSym/blob/master/LICENSE")
 		fmt.Println("Dependencies:")
