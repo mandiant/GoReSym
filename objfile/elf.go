@@ -425,3 +425,30 @@ func (f *elfFile) loadAddress() (uint64, error) {
 func (f *elfFile) dwarf() (*dwarf.Data, error) {
 	return f.elf.DWARF()
 }
+
+// getSections returns all sections for string extraction
+func (f *elfFile) getSections() ([]Section, error) {
+	var sections []Section
+	for _, sec := range f.elf.Sections {
+		data, err := sec.Data()
+		if err != nil {
+			continue
+		}
+		sections = append(sections, Section{
+			Name: sec.Name,
+			Addr: sec.Addr,
+			Data: data,
+		})
+	}
+	return sections, nil
+}
+
+// is64Bit returns true if this is a 64-bit ELF file
+func (f *elfFile) is64Bit() bool {
+	return f.elf.Class == elf.ELFCLASS64
+}
+
+// isLittleEndian returns true if this is a little-endian ELF file
+func (f *elfFile) isLittleEndian() bool {
+	return f.elf.Data == elf.ELFDATA2LSB
+}

@@ -289,9 +289,11 @@ restartParseWithRealTextBase:
 	}
 
 	if printStrings {
-		// TODO: Implement actual string extraction
-		// For now, add a placeholder to verify the flag works
-		extractMetadata.Strings = []string{"[String extraction not yet implemented]"}
+		strings, err := file.ExtractStrings()
+		if err == nil {
+			extractMetadata.Strings = strings
+		}
+		// If error, Strings will remain empty (nil slice)
 	}
 
 	if !noPrintFunctions {
