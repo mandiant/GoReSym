@@ -63,6 +63,7 @@ In this example, we ask GoReSym to recover type names (`-t`), user package names
     },
     "Types": [ ... ],
     "Files": [ ... ],
+    "Strings": [ ... ],
     "UserFunctions": [ ... ],
     "StdFunctions": [ ... ]
 }
@@ -73,6 +74,7 @@ Here are all the available flags:
 * `-d` ("default", optional) flag will print standard Go packages in addition to user packages.
 * `-p` ("paths", optional) flag will print any file paths embedded in the `pclntab`.
 * `-t` ("types", optional) flag will print Go type names.
+* `-strings` (optional) flag will extract embedded Go strings from the binary by analyzing the string internment table.
 * `-m <virtual address>` ("manual", optional) flag will dump the `RTYPE` structure recursively at the given virtual address
 * `-v <version string>` ("version", optional) flag will override automated version detection and use the provided version. This is needed for some stripped binaries. Type parsing will fail if the version is not accurate.
 * `-human` (optional) flag will print a flat text listing instead of JSON. Especially useful when printing structure and interface types.
