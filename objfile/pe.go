@@ -521,3 +521,36 @@ func (f *peFile) loadAddress() (uint64, error) {
 func (f *peFile) dwarf() (*dwarf.Data, error) {
 	return f.pe.DWARF()
 }
+
+// getSections returns all sections for string extraction
+func (f *peFile) getSections() ([]Section, error) {
+	var sections []Section
+	for _, sec := range f.pe.Sections {
+		data, err := sec.Data()
+		if err != nil {
+			continue
+		}
+		sections = append(sections, Section{
+			Name: sec.Name,
+			Addr: uint64(sec.VirtualAddress),
+			Data: data,
+		})
+	}
+	return sections, nil
+}
+
+// is64Bit returns true if this is a 64-bit PE file
+func (f *peFile) is64Bit() bool {
+	switch f.pe.OptionalHeader.(type) {
+	case *pe.OptionalHeader64:
+		return true
+	default:
+		return false
+	}
+}
+
+// isLittleEndian returns true if this is a little-endian PE file
+// PE files are always little-endian on x86/x64/ARM architectures
+func (f *peFile) isLittleEndian() bool {
+	return true
+}
