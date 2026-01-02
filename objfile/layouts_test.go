@@ -372,3 +372,212 @@ func TestModuleDataIntermediate_FieldTypes(t *testing.T) {
 		}
 	}
 }
+
+// Test legacy Go versions (1.5-1.15)
+func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
+	t.Run("ModuleData12_64_Go18-15", func(t *testing.T) {
+		var md ModuleData12_64
+		layout := getModuleDataLayout("1.8")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Types", int(unsafe.Offsetof(md.Types))},
+			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
+			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+	})
+
+	t.Run("ModuleData12_32_Go18-15", func(t *testing.T) {
+		var md ModuleData12_32
+		layout := getModuleDataLayout("1.8")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset32 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Types", int(unsafe.Offsetof(md.Types))},
+			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
+			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset32 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset32)
+			}
+		}
+	})
+
+	t.Run("ModuleData12_r17_64_Go17", func(t *testing.T) {
+		var md ModuleData12_r17_64
+		layout := getModuleDataLayout("1.7")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Types", int(unsafe.Offsetof(md.Types))},
+			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+	})
+
+	t.Run("ModuleData12_r17_32_Go17", func(t *testing.T) {
+		var md ModuleData12_r17_32
+		layout := getModuleDataLayout("1.7")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset32 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Types", int(unsafe.Offsetof(md.Types))},
+			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset32 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset32)
+			}
+		}
+	})
+
+	t.Run("ModuleData12_r15_r16_64_Go15-16", func(t *testing.T) {
+		var md ModuleData12_r15_r16_64
+		layout := getModuleDataLayout("1.5")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+	})
+
+	t.Run("ModuleData12_r15_r16_32_Go15-16", func(t *testing.T) {
+		var md ModuleData12_r15_r16_32
+		layout := getModuleDataLayout("1.5")
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset32 int
+		}{
+			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
+			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
+			{"Text", int(unsafe.Offsetof(md.Text))},
+			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset32 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset32)
+			}
+		}
+	})
+}
+
+// Test version mapping for legacy versions
+func TestVersionMapping_Legacy(t *testing.T) {
+	testCases := []struct {
+		version      string
+		expectedName string
+	}{
+		{"1.5", "1.5"},
+		{"1.6", "1.5"},
+		{"1.7", "1.7"},
+		{"1.8", "1.8"},
+		{"1.9", "1.8"},
+		{"1.10", "1.8"},
+		{"1.11", "1.8"},
+		{"1.12", "1.8"},
+		{"1.13", "1.8"},
+		{"1.14", "1.8"},
+		{"1.15", "1.8"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.version, func(t *testing.T) {
+			layout := getModuleDataLayout(tc.version)
+			if layout.Version != tc.expectedName {
+				t.Errorf("Version %s mapped to layout %s, expected %s",
+					tc.version, layout.Version, tc.expectedName)
+			}
+		})
+	}
+}

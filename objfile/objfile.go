@@ -349,232 +349,77 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			return secStart, result, nil
 
 		case "1.2":
+			// Refactored: Go 1.5-1.15 use generic parser with layout tables
 			// this layout changes <= 1.5 even though the tab version stays constant
 			switch runtimeVersion {
-			case "1.5":
-				fallthrough
-			case "1.6":
-				if is64bit {
-					var module ModuleData12_r15_r16_64
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
-
-					var firstFunc FuncTab12_116_64
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					// Fake the same Types + Typelinks offsets that later moduledata's use.
-					// The base would be the normal typelinks pointer, and then we
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.LegacyTypes = module.Typelinks
-					return secStart, moduleData, err
-				} else {
-					var module ModuleData12_r15_r16_32
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
-
-					var firstFunc FuncTab12_116_32
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.LegacyTypes.Data = pvoid64(module.Typelinks.Data)
-					moduleData.LegacyTypes.Len = uint64(module.Typelinks.Len)
-					moduleData.LegacyTypes.Capacity = uint64(module.Typelinks.Capacity)
-					return secStart, moduleData, err
+			case "1.5", "1.6":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.5", is64bit, littleendian)
+				if err != nil {
+					continue
 				}
+
+				// Validate using legacy validation (no Types field, uses LegacyTypes)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					runtimeVersion,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
+
 			case "1.7":
-				if is64bit {
-					var module ModuleData12_r17_64
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
-
-					var firstFunc FuncTab12_116_64
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					// Fake the same Types + Typelinks offsets that later moduledata's use.
-					// The base would be the normal typelinks pointer, and then we
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.Types = uint64(module.Types)
-					moduleData.ETypes = uint64(module.Etypes)
-					moduleData.Typelinks = module.Typelinks
-					moduleData.ITablinks = module.Itablinks
-					return secStart, moduleData, err
-				} else {
-					var module ModuleData12_r17_32
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
-
-					var firstFunc FuncTab12_116_32
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.Types = uint64(module.Types)
-					moduleData.ETypes = uint64(module.Etypes)
-					moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)
-					moduleData.Typelinks.Len = uint64(module.Typelinks.Len)
-					moduleData.Typelinks.Capacity = uint64(module.Typelinks.Capacity)
-
-					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
-					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
-					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
-					return secStart, moduleData, err
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.7", is64bit, littleendian)
+				if err != nil {
+					continue
 				}
-			case "1.8":
-				fallthrough
-			case "1.9":
-				fallthrough
-			case "1.10":
-				fallthrough
-			case "1.11":
-				fallthrough
-			case "1.12":
-				fallthrough
-			case "1.13":
-				fallthrough
-			case "1.14":
-				fallthrough
-			case "1.15":
-				if is64bit {
-					var module ModuleData12_64
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
 
-					var firstFunc FuncTab12_116_64
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.Types = uint64(module.Types)
-					moduleData.ETypes = uint64(module.Etypes)
-					moduleData.Typelinks = module.Typelinks
-					moduleData.ITablinks = module.Itablinks
-					return secStart, moduleData, err
-				} else {
-					var module ModuleData12_32
-					err := module.parse(moduleDataCandidate.Moduledata, littleendian)
-					if err != nil {
-						continue
-					}
-
-					var firstFunc FuncTab12_116_32
-					ftab_raw, err := e.raw.read_memory(uint64(module.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-					if err != nil {
-						continue
-					}
-
-					err = firstFunc.parse(ftab_raw, littleendian)
-					if err != nil {
-						continue
-					}
-
-					// functab's first function should equal the minpc value of moduledata. If not, parse failed, or we found wrong moduledata
-					if uint64(firstFunc.Entryoffset) != uint64(module.Minpc) {
-						// wrong moduledata, try next
-						ignorelist = append(ignorelist, moduleDataCandidate.ModuledataVA)
-						continue
-					}
-
-					moduleData.VA = moduleDataCandidate.ModuledataVA
-					moduleData.TextVA = uint64(module.Text)
-					moduleData.Types = uint64(module.Types)
-					moduleData.ETypes = uint64(module.Etypes)
-					moduleData.Typelinks.Data = pvoid64(module.Typelinks.Data)
-					moduleData.Typelinks.Len = uint64(module.Typelinks.Len)
-					moduleData.Typelinks.Capacity = uint64(module.Typelinks.Capacity)
-
-					moduleData.ITablinks.Data = pvoid64(module.Itablinks.Data)
-					moduleData.ITablinks.Len = uint64(module.Itablinks.Len)
-					moduleData.ITablinks.Capacity = uint64(module.Itablinks.Capacity)
-					return secStart, moduleData, err
+				// Validate using legacy validation (has Types/Etypes/Itablinks)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					runtimeVersion,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
 				}
+
+				return secStart, result, nil
+
+			case "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.8", is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate using legacy validation (has Types/Etypes/Itablinks/Textsectmap)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					runtimeVersion,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
 			}
 		}
 	}

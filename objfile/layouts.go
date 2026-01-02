@@ -34,6 +34,12 @@ func getModuleDataLayout(version string) *ModuleDataLayout {
 		layoutName = "1.18"
 	case "1.17", "1.16":
 		layoutName = "1.16"
+	case "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8":
+		layoutName = "1.8"
+	case "1.7":
+		layoutName = "1.7"
+	case "1.6", "1.5":
+		layoutName = "1.5"
 	}
 
 	layout, exists := moduleDataLayouts[layoutName]
@@ -97,6 +103,42 @@ var moduleDataLayouts = map[string]*ModuleDataLayout{
 			{Name: "Textsectmap", Offset64: 296, Offset32: 148, Type: "slice"},
 			{Name: "Typelinks", Offset64: 320, Offset32: 160, Type: "slice"},
 			{Name: "Itablinks", Offset64: 344, Offset32: 172, Type: "slice"},
+		},
+	},
+	// Legacy Go versions (1.2-1.15)
+	"1.8": {
+		Version: "1.8", // Go 1.8-1.15 (ModuleData12_64/32)
+		Fields: []FieldInfo{
+			{Name: "Ftab", Offset64: 24, Offset32: 12, Type: "slice"},
+			{Name: "Minpc", Offset64: 80, Offset32: 40, Type: "pvoid"},
+			{Name: "Text", Offset64: 96, Offset32: 48, Type: "pvoid"},
+			{Name: "Types", Offset64: 200, Offset32: 100, Type: "pvoid"},
+			{Name: "Etypes", Offset64: 208, Offset32: 104, Type: "pvoid"},
+			{Name: "Textsectmap", Offset64: 216, Offset32: 108, Type: "slice"},
+			{Name: "Typelinks", Offset64: 240, Offset32: 120, Type: "slice"},
+			{Name: "Itablinks", Offset64: 264, Offset32: 132, Type: "slice"},
+		},
+	},
+	"1.7": {
+		Version: "1.7", // Go 1.7 (ModuleData12_r17_64/32)
+		Fields: []FieldInfo{
+			{Name: "Ftab", Offset64: 24, Offset32: 12, Type: "slice"},
+			{Name: "Minpc", Offset64: 80, Offset32: 40, Type: "pvoid"},
+			{Name: "Text", Offset64: 96, Offset32: 48, Type: "pvoid"},
+			{Name: "Types", Offset64: 200, Offset32: 100, Type: "pvoid"},
+			{Name: "Etypes", Offset64: 208, Offset32: 104, Type: "pvoid"},
+			{Name: "Typelinks", Offset64: 216, Offset32: 108, Type: "slice"},
+			{Name: "Itablinks", Offset64: 240, Offset32: 120, Type: "slice"},
+		},
+	},
+	"1.5": {
+		Version: "1.5", // Go 1.5-1.6 (ModuleData12_r15_r16_64/32)
+		Fields: []FieldInfo{
+			{Name: "Ftab", Offset64: 24, Offset32: 12, Type: "slice"},
+			{Name: "Minpc", Offset64: 80, Offset32: 40, Type: "pvoid"},
+			{Name: "Text", Offset64: 96, Offset32: 48, Type: "pvoid"},
+			// Note: No Types/Etypes/Itablinks for 1.5-1.6
+			{Name: "Typelinks", Offset64: 200, Offset32: 100, Type: "slice"}, // Legacy format
 		},
 	},
 }
@@ -388,6 +430,134 @@ func (e *Entry) validateAndConvertModuleData_116(
 		ETypes:    md.Etypes,
 		Typelinks: md.Typelinks,
 		ITablinks: md.Itablinks,
+	}
+
+	return result, ignorelist, nil
+}
+
+// validateAndConvertModuleData_Legacy performs validation for Go 1.7-1.15
+// These versions have Types/Etypes/Itablinks but use simpler validation (direct minpc check)
+func (e *Entry) validateAndConvertModuleData_Legacy(
+	md *ModuleDataIntermediate,
+	moduleDataVA uint64,
+	version string,
+	is64bit bool,
+	littleendian bool,
+	ignorelist []uint64,
+) (*ModuleData, []uint64, error) {
+
+	// Read and validate first function from ftab
+	if is64bit {
+		var firstFunc FuncTab12_116_64
+		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		err = firstFunc.parse(ftab_raw, littleendian)
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		// Validate: functab's first function should equal minpc value
+		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			// Wrong moduledata, add to ignorelist
+			ignorelist = append(ignorelist, moduleDataVA)
+			return nil, ignorelist, fmt.Errorf("minpc validation failed")
+		}
+	} else {
+		var firstFunc FuncTab12_116_32
+		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		err = firstFunc.parse(ftab_raw, littleendian)
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		// Validate: functab's first function should equal minpc value
+		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			// Wrong moduledata, add to ignorelist
+			ignorelist = append(ignorelist, moduleDataVA)
+			return nil, ignorelist, fmt.Errorf("minpc validation failed")
+		}
+	}
+
+	// Validation passed, create final ModuleData struct
+	result := &ModuleData{
+		VA:        moduleDataVA,
+		TextVA:    md.Text,
+		Types:     md.Types,
+		ETypes:    md.Etypes,
+		Typelinks: md.Typelinks,
+		ITablinks: md.Itablinks,
+	}
+
+	return result, ignorelist, nil
+}
+
+// validateAndConvertModuleData_Legacy_NoTypes performs validation for Go 1.5-1.6
+// These versions use LegacyTypes instead of Types/Etypes, no Itablinks
+func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
+	md *ModuleDataIntermediate,
+	moduleDataVA uint64,
+	version string,
+	is64bit bool,
+	littleendian bool,
+	ignorelist []uint64,
+) (*ModuleData, []uint64, error) {
+
+	// Read and validate first function from ftab
+	if is64bit {
+		var firstFunc FuncTab12_116_64
+		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		err = firstFunc.parse(ftab_raw, littleendian)
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		// Validate: functab's first function should equal minpc value
+		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			// Wrong moduledata, add to ignorelist
+			ignorelist = append(ignorelist, moduleDataVA)
+			return nil, ignorelist, fmt.Errorf("minpc validation failed")
+		}
+	} else {
+		var firstFunc FuncTab12_116_32
+		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		err = firstFunc.parse(ftab_raw, littleendian)
+		if err != nil {
+			return nil, ignorelist, err
+		}
+
+		// Validate: functab's first function should equal minpc value
+		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			// Wrong moduledata, add to ignorelist
+			ignorelist = append(ignorelist, moduleDataVA)
+			return nil, ignorelist, fmt.Errorf("minpc validation failed")
+		}
+	}
+
+	// Validation passed, create final ModuleData struct
+	// Use LegacyTypes instead of Types/Etypes for Go 1.5-1.6
+	result := &ModuleData{
+		VA:     moduleDataVA,
+		TextVA: md.Text,
+		LegacyTypes: GoSlice64{
+			Data:     pvoid64(md.Typelinks.Data),
+			Len:      md.Typelinks.Len,
+			Capacity: md.Typelinks.Capacity,
+		},
 	}
 
 	return result, ignorelist, nil
