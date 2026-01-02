@@ -562,3 +562,225 @@ func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
 
 	return result, ignorelist, nil
 }
+
+// ========================================
+// Type (Rtype) Layout System
+// ========================================
+
+// RtypeLayout describes the binary layout of a Go runtime type structure
+type RtypeLayout struct {
+	Version    string
+	Fields     []FieldInfo
+	StrType    string // "pointer" for 1.5-1.6, "offset" for 1.7+
+	FlagsField string // "Unused" for 1.5-1.6, "Tflag" for 1.7+
+	BaseSize64 int    // Size of the Rtype struct in 64-bit binaries
+	BaseSize32 int    // Size of the Rtype struct in 32-bit binaries
+}
+
+// RtypeIntermediate holds parsed Rtype fields
+type RtypeIntermediate struct {
+	Size       uint64
+	Ptrdata    uint64
+	Hash       uint32
+	Tflag      tflag // or Unused for older versions
+	Align      uint8
+	FieldAlign uint8
+	Kind       uint8
+	Str        uint64 // Pointer (1.5-1.6) or offset (1.7+)
+}
+
+// getRtypeLayout returns the layout for a given Go runtime version
+func getRtypeLayout(runtimeVersion string) *RtypeLayout {
+	layoutName := ""
+
+	switch runtimeVersion {
+	case "1.5":
+		layoutName = "1.5"
+	case "1.6":
+		layoutName = "1.6"
+	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13":
+		layoutName = "1.7"
+	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19":
+		layoutName = "1.14"
+	case "1.20", "1.21", "1.22", "1.23", "1.24":
+		layoutName = "1.20"
+	default:
+		return nil
+	}
+
+	return rtypeLayouts[layoutName]
+}
+
+// rtypeLayouts defines field layouts for different Go runtime type versions
+var rtypeLayouts = map[string]*RtypeLayout{
+	"1.5": {
+		Version: "1.5",
+		Fields: []FieldInfo{
+			{Name: "Size", Offset64: 0, Offset32: 0, Type: "pvoid"},
+			{Name: "Ptrdata", Offset64: 8, Offset32: 4, Type: "pvoid"},
+			{Name: "Hash", Offset64: 16, Offset32: 8, Type: "uint32"},
+			{Name: "Unused", Offset64: 20, Offset32: 12, Type: "uint8"},
+			{Name: "Align", Offset64: 21, Offset32: 13, Type: "uint8"},
+			{Name: "FieldAlign", Offset64: 22, Offset32: 14, Type: "uint8"},
+			{Name: "Kind", Offset64: 23, Offset32: 15, Type: "uint8"},
+			{Name: "Str", Offset64: 40, Offset32: 24, Type: "pvoid"}, // Direct pointer
+		},
+		StrType:    "pointer",
+		FlagsField: "Unused",
+		BaseSize64: 72,
+		BaseSize32: 40,
+	},
+	"1.6": {
+		Version: "1.6",
+		Fields: []FieldInfo{
+			{Name: "Size", Offset64: 0, Offset32: 0, Type: "pvoid"},
+			{Name: "Ptrdata", Offset64: 8, Offset32: 4, Type: "pvoid"},
+			{Name: "Hash", Offset64: 16, Offset32: 8, Type: "uint32"},
+			{Name: "Unused", Offset64: 20, Offset32: 12, Type: "uint8"},
+			{Name: "Align", Offset64: 21, Offset32: 13, Type: "uint8"},
+			{Name: "FieldAlign", Offset64: 22, Offset32: 14, Type: "uint8"},
+			{Name: "Kind", Offset64: 23, Offset32: 15, Type: "uint8"},
+			{Name: "Str", Offset64: 40, Offset32: 24, Type: "pvoid"}, // Direct pointer
+		},
+		StrType:    "pointer",
+		FlagsField: "Unused",
+		BaseSize64: 64,
+		BaseSize32: 36,
+	},
+	"1.7": {
+		Version: "1.7", // Go 1.7-1.13
+		Fields: []FieldInfo{
+			{Name: "Size", Offset64: 0, Offset32: 0, Type: "pvoid"},
+			{Name: "Ptrdata", Offset64: 8, Offset32: 4, Type: "pvoid"},
+			{Name: "Hash", Offset64: 16, Offset32: 8, Type: "uint32"},
+			{Name: "Tflag", Offset64: 20, Offset32: 12, Type: "uint8"},
+			{Name: "Align", Offset64: 21, Offset32: 13, Type: "uint8"},
+			{Name: "FieldAlign", Offset64: 22, Offset32: 14, Type: "uint8"},
+			{Name: "Kind", Offset64: 23, Offset32: 15, Type: "uint8"},
+			{Name: "Str", Offset64: 40, Offset32: 24, Type: "int32"}, // Offset from Types base
+		},
+		StrType:    "offset",
+		FlagsField: "Tflag",
+		BaseSize64: 48,
+		BaseSize32: 32,
+	},
+	"1.14": {
+		Version: "1.14", // Go 1.14-1.19 (same layout as 1.7, different Equal vs Alg)
+		Fields: []FieldInfo{
+			{Name: "Size", Offset64: 0, Offset32: 0, Type: "pvoid"},
+			{Name: "Ptrdata", Offset64: 8, Offset32: 4, Type: "pvoid"},
+			{Name: "Hash", Offset64: 16, Offset32: 8, Type: "uint32"},
+			{Name: "Tflag", Offset64: 20, Offset32: 12, Type: "uint8"},
+			{Name: "Align", Offset64: 21, Offset32: 13, Type: "uint8"},
+			{Name: "FieldAlign", Offset64: 22, Offset32: 14, Type: "uint8"},
+			{Name: "Kind", Offset64: 23, Offset32: 15, Type: "uint8"},
+			{Name: "Str", Offset64: 40, Offset32: 24, Type: "int32"}, // Offset from Types base
+		},
+		StrType:    "offset",
+		FlagsField: "Tflag",
+		BaseSize64: 48,
+		BaseSize32: 32,
+	},
+	"1.20": {
+		Version: "1.20", // Go 1.20+ (ABIType, same layout as 1.14)
+		Fields: []FieldInfo{
+			{Name: "Size", Offset64: 0, Offset32: 0, Type: "pvoid"},
+			{Name: "Ptrdata", Offset64: 8, Offset32: 4, Type: "pvoid"},
+			{Name: "Hash", Offset64: 16, Offset32: 8, Type: "uint32"},
+			{Name: "Tflag", Offset64: 20, Offset32: 12, Type: "uint8"},
+			{Name: "Align", Offset64: 21, Offset32: 13, Type: "uint8"},
+			{Name: "FieldAlign", Offset64: 22, Offset32: 14, Type: "uint8"},
+			{Name: "Kind", Offset64: 23, Offset32: 15, Type: "uint8"},
+			{Name: "Str", Offset64: 40, Offset32: 24, Type: "int32"}, // Offset from Types base
+		},
+		StrType:    "offset",
+		FlagsField: "Tflag",
+		BaseSize64: 48,
+		BaseSize32: 32,
+	},
+}
+
+// Helper functions for reading type-specific fields
+
+func readUint32(data []byte, offset int, littleendian bool) uint32 {
+	if littleendian {
+		return uint32(data[offset]) |
+			uint32(data[offset+1])<<8 |
+			uint32(data[offset+2])<<16 |
+			uint32(data[offset+3])<<24
+	} else {
+		return uint32(data[offset])<<24 |
+			uint32(data[offset+1])<<16 |
+			uint32(data[offset+2])<<8 |
+			uint32(data[offset+3])
+	}
+}
+
+func readInt32(data []byte, offset int, littleendian bool) int32 {
+	return int32(readUint32(data, offset, littleendian))
+}
+
+// parseRtypeGeneric parses Rtype data using the layout table approach
+func parseRtypeGeneric(rawData []byte, runtimeVersion string, is64bit bool, littleendian bool) (*RtypeIntermediate, uint64, error) {
+	layout := getRtypeLayout(runtimeVersion)
+	if layout == nil {
+		return nil, 0, fmt.Errorf("unknown runtime version: %s", runtimeVersion)
+	}
+
+	rt := &RtypeIntermediate{}
+
+	for _, field := range layout.Fields {
+		offset := field.Offset64
+		if !is64bit {
+			offset = field.Offset32
+		}
+
+		switch field.Name {
+		case "Size":
+			rt.Size = readPointer(rawData, offset, is64bit, littleendian)
+		case "Ptrdata":
+			rt.Ptrdata = readPointer(rawData, offset, is64bit, littleendian)
+		case "Hash":
+			rt.Hash = readUint32(rawData, offset, littleendian)
+		case "Unused", "Tflag":
+			rt.Tflag = tflag(rawData[offset])
+		case "Align":
+			rt.Align = rawData[offset]
+		case "FieldAlign":
+			rt.FieldAlign = rawData[offset]
+		case "Kind":
+			rt.Kind = rawData[offset]
+		case "Str":
+			if layout.StrType == "pointer" {
+				// Go 1.5-1.6: Str is a direct pointer
+				rt.Str = readPointer(rawData, offset, is64bit, littleendian)
+			} else {
+				// Go 1.7+: Str is an int32 offset from moduledata.Types
+				rt.Str = uint64(readInt32(rawData, offset, littleendian))
+			}
+		}
+	}
+
+	// Return baseSize as well
+	var baseSize uint64
+	if is64bit {
+		baseSize = uint64(layout.BaseSize64)
+	} else {
+		baseSize = uint64(layout.BaseSize32)
+	}
+
+	return rt, baseSize, nil
+}
+
+// getRtypeFieldOffset returns the offset for a named field in an Rtype layout
+func getRtypeFieldOffset(layout *RtypeLayout, fieldName string, is64bit bool) (int, bool) {
+	for _, field := range layout.Fields {
+		if field.Name == fieldName {
+			if is64bit {
+				return field.Offset64, true
+			}
+			return field.Offset32, true
+		}
+	}
+	return 0, false
+}

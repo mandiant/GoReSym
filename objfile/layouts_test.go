@@ -581,3 +581,168 @@ func TestVersionMapping_Legacy(t *testing.T) {
 		})
 	}
 }
+
+// Test Rtype layout offsets
+func TestRtypeLayoutOffsets(t *testing.T) {
+	t.Run("Rtype15_64", func(t *testing.T) {
+		var rt Rtype15_64
+		layout := getRtypeLayout("1.5")
+		if layout == nil {
+			t.Fatal("Layout for 1.5 is nil")
+		}
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Size", int(unsafe.Offsetof(rt.Size))},
+			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
+			{"Hash", int(unsafe.Offsetof(rt.Hash))},
+			{"Unused", int(unsafe.Offsetof(rt.Unused))},
+			{"Align", int(unsafe.Offsetof(rt.Align))},
+			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
+			{"Kind", int(unsafe.Offsetof(rt.Kind))},
+			{"Str", int(unsafe.Offsetof(rt.Str))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+
+		// Check size
+		if layout.BaseSize64 != int(unsafe.Sizeof(rt)) {
+			t.Errorf("BaseSize64 mismatch: layout=%d actual=%d",
+				layout.BaseSize64, unsafe.Sizeof(rt))
+		}
+	})
+
+	t.Run("Rtype17_64", func(t *testing.T) {
+		var rt Rtype17_18_19_110_111_112_113_64
+		layout := getRtypeLayout("1.7")
+		if layout == nil {
+			t.Fatal("Layout for 1.7 is nil")
+		}
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Size", int(unsafe.Offsetof(rt.Size))},
+			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
+			{"Hash", int(unsafe.Offsetof(rt.Hash))},
+			{"Tflag", int(unsafe.Offsetof(rt.Tflag))},
+			{"Align", int(unsafe.Offsetof(rt.Align))},
+			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
+			{"Kind", int(unsafe.Offsetof(rt.Kind))},
+			{"Str", int(unsafe.Offsetof(rt.Str))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+
+		// Check size
+		if layout.BaseSize64 != int(unsafe.Sizeof(rt)) {
+			t.Errorf("BaseSize64 mismatch: layout=%d actual=%d",
+				layout.BaseSize64, unsafe.Sizeof(rt))
+		}
+	})
+
+	t.Run("ABIType64", func(t *testing.T) {
+		var rt ABIType64
+		layout := getRtypeLayout("1.20")
+		if layout == nil {
+			t.Fatal("Layout for 1.20 is nil")
+		}
+
+		testCases := []struct {
+			fieldName      string
+			actualOffset64 int
+		}{
+			{"Size", int(unsafe.Offsetof(rt.Size))},
+			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
+			{"Hash", int(unsafe.Offsetof(rt.Hash))},
+			{"Tflag", int(unsafe.Offsetof(rt.Tflag))},
+			{"Align", int(unsafe.Offsetof(rt.Align))},
+			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
+			{"Kind", int(unsafe.Offsetof(rt.Kind))},
+			{"Str", int(unsafe.Offsetof(rt.Str))},
+		}
+
+		for _, tc := range testCases {
+			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
+			if !found {
+				t.Errorf("Field %s not found in layout", tc.fieldName)
+				continue
+			}
+			if layoutOffset != tc.actualOffset64 {
+				t.Errorf("Field %s offset mismatch: layout=%d actual=%d",
+					tc.fieldName, layoutOffset, tc.actualOffset64)
+			}
+		}
+
+		// Check size
+		if layout.BaseSize64 != int(unsafe.Sizeof(rt)) {
+			t.Errorf("BaseSize64 mismatch: layout=%d actual=%d",
+				layout.BaseSize64, unsafe.Sizeof(rt))
+		}
+	})
+}
+
+// Test Rtype version mapping
+func TestRtypeVersionMapping(t *testing.T) {
+	testCases := []struct {
+		version      string
+		expectedName string
+	}{
+		{"1.5", "1.5"},
+		{"1.6", "1.6"},
+		{"1.7", "1.7"},
+		{"1.8", "1.7"},
+		{"1.9", "1.7"},
+		{"1.10", "1.7"},
+		{"1.11", "1.7"},
+		{"1.12", "1.7"},
+		{"1.13", "1.7"},
+		{"1.14", "1.14"},
+		{"1.15", "1.14"},
+		{"1.16", "1.14"},
+		{"1.17", "1.14"},
+		{"1.18", "1.14"},
+		{"1.19", "1.14"},
+		{"1.20", "1.20"},
+		{"1.21", "1.20"},
+		{"1.22", "1.20"},
+		{"1.23", "1.20"},
+		{"1.24", "1.20"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.version, func(t *testing.T) {
+			layout := getRtypeLayout(tc.version)
+			if layout == nil {
+				t.Fatalf("Layout for version %s is nil", tc.version)
+			}
+			if layout.Version != tc.expectedName {
+				t.Errorf("Version %s mapped to layout %s, expected %s",
+					tc.version, layout.Version, tc.expectedName)
+			}
+		})
+	}
+}

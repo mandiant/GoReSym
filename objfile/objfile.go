@@ -656,214 +656,56 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 
 	var _type *Type = nil
 
-	switch runtimeVersion {
-	case "1.5":
-		if is64bit {
-			var rtype Rtype15_64
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
+	// Refactored: Use generic layout-based parser for all versions
+	layout := getRtypeLayout(runtimeVersion)
+	if layout == nil {
+		return parsedTypesIn, fmt.Errorf("Unknown runtime version: %s", runtimeVersion)
+	}
 
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
+	// Read raw type data
+	var readSize uint64
+	if is64bit {
+		readSize = uint64(layout.BaseSize64)
+	} else {
+		readSize = uint64(layout.BaseSize32)
+	}
 
-			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
+	rtype_raw, err := e.raw.read_memory(typeAddress, readSize)
+	if err != nil {
+		return parsedTypesIn, fmt.Errorf("Failed to read type address")
+	}
 
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
-		} else {
-			var rtype Rtype15_32
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
+	// Parse using generic parser
+	rtype, baseSize, err := parseRtypeGeneric(rtype_raw, runtimeVersion, is64bit, littleendian)
+	if err != nil {
+		return parsedTypesIn, fmt.Errorf("Failed to parse type")
+	}
 
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
+	// Read type name (version-specific handling)
+	var name string
+	var namePtr uint64
+	if layout.StrType == "pointer" {
+		// Go 1.5-1.6: Str is direct pointer
+		namePtr = rtype.Str
+	} else {
+		// Go 1.7+: Str is offset from moduleData.Types
+		namePtr = moduleData.Types + rtype.Str
+	}
 
-			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
-		}
-	case "1.6":
-		if is64bit {
-			var rtype Rtype16_64
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
+	name, err = e.readRTypeName(runtimeVersion, rtype.Tflag, namePtr, is64bit, littleendian)
+	if err != nil {
+		return parsedTypesIn, fmt.Errorf("Failed to read type name")
+	}
 
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-
-			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
-		} else {
-			var rtype Rtype16_32
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-
-			name, err := e.readRTypeName(runtimeVersion, 0, uint64(rtype.Str), is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: tflagNamed}
-		}
-	case "1.7":
-		fallthrough
-	case "1.8":
-		fallthrough
-	case "1.9":
-		fallthrough
-	case "1.10":
-		fallthrough
-	case "1.11":
-		fallthrough
-	case "1.12":
-		fallthrough
-	case "1.13":
-		if is64bit {
-			var rtype Rtype17_18_19_110_111_112_113_64
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		} else {
-			var rtype Rtype17_18_19_110_111_112_113_32
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		}
-	case "1.14":
-		fallthrough
-	case "1.15":
-		fallthrough
-	case "1.16":
-		fallthrough
-	case "1.17":
-		fallthrough
-	case "1.18":
-		fallthrough
-	case "1.19":
-		if is64bit {
-			var rtype Rtype114_115_116_117_118_64
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		} else {
-			var rtype Rtype114_115_116_117_118_32
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		}
-	case "1.20":
-		fallthrough
-	case "1.21":
-		fallthrough
-	case "1.22":
-		fallthrough
-	case "1.23":
-		fallthrough
-	case "1.24":
-		if is64bit {
-			var rtype ABIType64
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		} else {
-			var rtype ABIType32
-			rtype_raw, err := e.raw.read_memory(typeAddress, uint64(unsafe.Sizeof(rtype)))
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type address")
-			}
-			err = rtype.parse(rtype_raw, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to parse type")
-			}
-			name_ptr := moduleData.Types + uint64(rtype.Str)
-			name, err := e.readRTypeName(runtimeVersion, rtype.Tflag, name_ptr, is64bit, littleendian)
-			if err != nil {
-				return parsedTypesIn, fmt.Errorf("Failed to read type name")
-			}
-			_type = &Type{VA: typeAddress, Str: name, CStr: typename_to_c(name), Kind: ((Kind)(rtype.Kind & 0x1f)).String(), baseSize: uint16(unsafe.Sizeof(rtype)), kindEnum: ((Kind)(rtype.Kind & 0x1f)), flags: rtype.Tflag}
-		}
-	default:
-		return parsedTypesIn, fmt.Errorf("Unknown runtime version")
+	// Create Type object
+	_type = &Type{
+		VA:       typeAddress,
+		Str:      name,
+		CStr:     typename_to_c(name),
+		Kind:     ((Kind)(rtype.Kind & 0x1f)).String(),
+		baseSize: uint16(baseSize),
+		kindEnum: ((Kind)(rtype.Kind & 0x1f)),
+		flags:    rtype.Tflag,
 	}
 
 	// insert into seen list
