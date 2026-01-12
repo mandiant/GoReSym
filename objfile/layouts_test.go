@@ -15,23 +15,23 @@ func TestLayoutOffsets_Match_StructDefinitions(t *testing.T) {
 		layout := getModuleDataLayout("1.21")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -46,23 +46,23 @@ func TestLayoutOffsets_Match_StructDefinitions(t *testing.T) {
 		layout := getModuleDataLayout("1.21")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset32 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset32 {
@@ -77,23 +77,23 @@ func TestLayoutOffsets_Match_StructDefinitions(t *testing.T) {
 		layout := getModuleDataLayout("1.20")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -108,23 +108,23 @@ func TestLayoutOffsets_Match_StructDefinitions(t *testing.T) {
 		layout := getModuleDataLayout("1.18")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -139,23 +139,23 @@ func TestLayoutOffsets_Match_StructDefinitions(t *testing.T) {
 		layout := getModuleDataLayout("1.16")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -348,27 +348,27 @@ func TestModuleDataIntermediate_FieldTypes(t *testing.T) {
 	// Use reflection to verify field types
 	mdType := reflect.TypeOf(md)
 
-	expectedFields := map[string]string{
-		"Ftab":        "objfile.GoSlice64",
-		"Minpc":       "uint64",
-		"Text":        "uint64",
-		"Types":       "uint64",
-		"Etypes":      "uint64",
-		"Textsectmap": "objfile.GoSlice64",
-		"Typelinks":   "objfile.GoSlice64",
-		"Itablinks":   "objfile.GoSlice64",
+	expectedFields := map[FieldName]string{
+		FieldFtab:        "objfile.GoSlice64",
+		FieldMinpc:       "uint64",
+		FieldText:        "uint64",
+		FieldTypes:       "uint64",
+		FieldEtypes:      "uint64",
+		FieldTextsectmap: "objfile.GoSlice64",
+		FieldTypelinks:   "objfile.GoSlice64",
+		FieldItablinks:   "objfile.GoSlice64",
 	}
 
 	for fieldName, expectedType := range expectedFields {
-		field, found := mdType.FieldByName(fieldName)
+		field, found := mdType.FieldByName(fieldName.String())
 		if !found {
-			t.Errorf("Field %s not found in ModuleDataIntermediate", fieldName)
+			t.Errorf("Field %s not found in ModuleDataIntermediate", fieldName.String())
 			continue
 		}
 		actualType := field.Type.String()
 		if actualType != expectedType {
 			t.Errorf("Field %s has type %s, expected %s",
-				fieldName, actualType, expectedType)
+				fieldName.String(), actualType, expectedType)
 		}
 	}
 }
@@ -380,23 +380,23 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.8")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -411,23 +411,23 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.8")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset32 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Textsectmap", int(unsafe.Offsetof(md.Textsectmap))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTextsectmap, int(unsafe.Offsetof(md.Textsectmap))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset32 {
@@ -442,22 +442,22 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.7")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -472,22 +472,22 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.7")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset32 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Types", int(unsafe.Offsetof(md.Types))},
-			{"Etypes", int(unsafe.Offsetof(md.Etypes))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
-			{"Itablinks", int(unsafe.Offsetof(md.Itablinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypes, int(unsafe.Offsetof(md.Types))},
+			{FieldEtypes, int(unsafe.Offsetof(md.Etypes))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
+			{FieldItablinks, int(unsafe.Offsetof(md.Itablinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset32 {
@@ -502,19 +502,19 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.5")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -529,19 +529,19 @@ func TestLayoutOffsets_Legacy_Versions(t *testing.T) {
 		layout := getModuleDataLayout("1.5")
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset32 int
 		}{
-			{"Ftab", int(unsafe.Offsetof(md.Ftab))},
-			{"Minpc", int(unsafe.Offsetof(md.Minpc))},
-			{"Text", int(unsafe.Offsetof(md.Text))},
-			{"Typelinks", int(unsafe.Offsetof(md.Typelinks))},
+			{FieldFtab, int(unsafe.Offsetof(md.Ftab))},
+			{FieldMinpc, int(unsafe.Offsetof(md.Minpc))},
+			{FieldText, int(unsafe.Offsetof(md.Text))},
+			{FieldTypelinks, int(unsafe.Offsetof(md.Typelinks))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getFieldOffset(layout, tc.fieldName, false)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset32 {
@@ -592,23 +592,23 @@ func TestRtypeLayoutOffsets(t *testing.T) {
 		}
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Size", int(unsafe.Offsetof(rt.Size))},
-			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
-			{"Hash", int(unsafe.Offsetof(rt.Hash))},
-			{"Unused", int(unsafe.Offsetof(rt.Unused))},
-			{"Align", int(unsafe.Offsetof(rt.Align))},
-			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
-			{"Kind", int(unsafe.Offsetof(rt.Kind))},
-			{"Str", int(unsafe.Offsetof(rt.Str))},
+			{FieldSize, int(unsafe.Offsetof(rt.Size))},
+			{FieldPtrdata, int(unsafe.Offsetof(rt.Ptrdata))},
+			{FieldHash, int(unsafe.Offsetof(rt.Hash))},
+			{FieldUnused, int(unsafe.Offsetof(rt.Unused))},
+			{FieldAlign, int(unsafe.Offsetof(rt.Align))},
+			{FieldFieldAlign, int(unsafe.Offsetof(rt.FieldAlign))},
+			{FieldKind, int(unsafe.Offsetof(rt.Kind))},
+			{FieldStr, int(unsafe.Offsetof(rt.Str))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -632,23 +632,23 @@ func TestRtypeLayoutOffsets(t *testing.T) {
 		}
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Size", int(unsafe.Offsetof(rt.Size))},
-			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
-			{"Hash", int(unsafe.Offsetof(rt.Hash))},
-			{"Tflag", int(unsafe.Offsetof(rt.Tflag))},
-			{"Align", int(unsafe.Offsetof(rt.Align))},
-			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
-			{"Kind", int(unsafe.Offsetof(rt.Kind))},
-			{"Str", int(unsafe.Offsetof(rt.Str))},
+			{FieldSize, int(unsafe.Offsetof(rt.Size))},
+			{FieldPtrdata, int(unsafe.Offsetof(rt.Ptrdata))},
+			{FieldHash, int(unsafe.Offsetof(rt.Hash))},
+			{FieldTflag, int(unsafe.Offsetof(rt.Tflag))},
+			{FieldAlign, int(unsafe.Offsetof(rt.Align))},
+			{FieldFieldAlign, int(unsafe.Offsetof(rt.FieldAlign))},
+			{FieldKind, int(unsafe.Offsetof(rt.Kind))},
+			{FieldStr, int(unsafe.Offsetof(rt.Str))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
@@ -672,23 +672,23 @@ func TestRtypeLayoutOffsets(t *testing.T) {
 		}
 
 		testCases := []struct {
-			fieldName      string
+			fieldName      FieldName
 			actualOffset64 int
 		}{
-			{"Size", int(unsafe.Offsetof(rt.Size))},
-			{"Ptrdata", int(unsafe.Offsetof(rt.Ptrdata))},
-			{"Hash", int(unsafe.Offsetof(rt.Hash))},
-			{"Tflag", int(unsafe.Offsetof(rt.Tflag))},
-			{"Align", int(unsafe.Offsetof(rt.Align))},
-			{"FieldAlign", int(unsafe.Offsetof(rt.FieldAlign))},
-			{"Kind", int(unsafe.Offsetof(rt.Kind))},
-			{"Str", int(unsafe.Offsetof(rt.Str))},
+			{FieldSize, int(unsafe.Offsetof(rt.Size))},
+			{FieldPtrdata, int(unsafe.Offsetof(rt.Ptrdata))},
+			{FieldHash, int(unsafe.Offsetof(rt.Hash))},
+			{FieldTflag, int(unsafe.Offsetof(rt.Tflag))},
+			{FieldAlign, int(unsafe.Offsetof(rt.Align))},
+			{FieldFieldAlign, int(unsafe.Offsetof(rt.FieldAlign))},
+			{FieldKind, int(unsafe.Offsetof(rt.Kind))},
+			{FieldStr, int(unsafe.Offsetof(rt.Str))},
 		}
 
 		for _, tc := range testCases {
 			layoutOffset, found := getRtypeFieldOffset(layout, tc.fieldName, true)
 			if !found {
-				t.Errorf("Field %s not found in layout", tc.fieldName)
+				t.Errorf("Field %s not found in layout", tc.fieldName.String())
 				continue
 			}
 			if layoutOffset != tc.actualOffset64 {
