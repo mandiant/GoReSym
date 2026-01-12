@@ -419,3 +419,24 @@ func (f *machoFile) loadAddress() (uint64, error) {
 func (f *machoFile) dwarf() (*dwarf.Data, error) {
 	return f.macho.DWARF()
 }
+
+// iterateSections calls the provided function for each section.
+// This avoids loading all section data into memory at once.
+func (f *machoFile) iterateSections(fn func(Section) error) error {
+	for _, sec := range f.macho.Sections {
+		data, err := sec.Data()
+		if err != nil {
+			// Skip sections we can't read
+			continue
+		}
+		section := Section{
+			Name: sec.Name,
+			Addr: sec.Addr,
+			Data: data,
+		}
+		if err := fn(section); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -50,28 +50,26 @@ func (f *File) ExtractStrings() ([]string, error) {
 
 // extractStrings performs string extraction for a single Entry
 func (e *Entry) extractStrings() ([]string, error) {
-	// Get sections that might contain string data
-	sections, err := e.getSections()
-	if err != nil {
-		return nil, err
-	}
-
 	// Determine binary properties
 	is64bit := e.is64Bit()
 	isLittleEndian := e.isLittleEndian()
 
 	var allCandidates []StringCandidate
 
-	// Scan each section for string candidates
-	for _, section := range sections {
+	// Use callback pattern to avoid loading all sections into memory at once
+	err := e.iterateSections(func(section Section) error {
 		// Skip sections that are unlikely to contain string structures
 		// Focus on .rodata, .data, .noptrdata sections
 		if !isDataSection(section.Name) {
-			continue
+			return nil
 		}
 
 		candidates := findStringCandidates(section.Data, section.Addr, is64bit, isLittleEndian)
 		allCandidates = append(allCandidates, candidates...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if len(allCandidates) == 0 {
@@ -101,15 +99,16 @@ func (e *Entry) extractStrings() ([]string, error) {
 	return strings, nil
 }
 
-// getSections returns the sections from the binary
-func (e *Entry) getSections() ([]Section, error) {
-	// Use the rawFile interface to get sections
+// iterateSections calls the provided function for each section in the binary.
+// This uses a callback pattern to avoid memory pressure from loading all sections at once.
+func (e *Entry) iterateSections(fn func(Section) error) error {
+	// Use the rawFile interface to iterate sections
 	if sectioner, ok := e.raw.(interface {
-		getSections() ([]Section, error)
+		iterateSections(func(Section) error) error
 	}); ok {
-		return sectioner.getSections()
+		return sectioner.iterateSections(fn)
 	}
-	return nil, fmt.Errorf("binary format does not support section enumeration")
+	return fmt.Errorf("binary format does not support section enumeration")
 }
 
 // Section represents a binary section
