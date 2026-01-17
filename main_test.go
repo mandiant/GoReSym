@@ -30,7 +30,7 @@ func TestAllVersions(t *testing.T) {
 			}
 
 			t.Run(versionPath, func(t *testing.T) {
-				data, err := main_impl(filePath, true, true, true, false, 0, "")
+				data, err := main_impl(filePath, true, true, true, false, 0, "", false)
 				if err != nil {
 					t.Errorf("Go %s failed on %s: %s", v, file, err)
 				}
@@ -119,7 +119,7 @@ func testSymbolRecovery(t *testing.T, workingDirectory string, binaryName string
 		return
 	}
 
-	data, err := main_impl(filePath, true, true, true, false, 0, "")
+	data, err := main_impl(filePath, true, true, true, false, 0, "", false)
 	if err != nil {
 		t.Errorf("GoReSym failed: %s", err)
 	}
@@ -214,7 +214,7 @@ func TestWeirdBins(t *testing.T) {
 			return
 		}
 
-		_, err := main_impl(filePath, true, true, true, false, 0, "")
+		_, err := main_impl(filePath, true, true, true, false, 0, "", false)
 		if err == nil {
 			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
 		}
@@ -228,7 +228,7 @@ func TestWeirdBins(t *testing.T) {
 			return
 		}
 
-		_, err := main_impl(filePath, true, true, true, false, 0, "")
+		_, err := main_impl(filePath, true, true, true, false, 0, "", false)
 		if err == nil {
 			t.Errorf("GoReSym found pclntab in a non-go binary, this is not possible.")
 		}
@@ -244,4 +244,101 @@ func TestBig(t *testing.T) {
 	t.Run("kubectl_macho", func(t *testing.T) {
 		testSymbolRecovery(t, workingDirectory, "kubectl_macho", 0x6C6CB20, 0x7F8CB20, 0x5CD9E40)
 	})
+}
+
+func isPrintable(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, r := range s {
+		if r < 32 || r > 126 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestStringExtraction(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Errorf("Failed to get working directory")
+		return
+	}
+
+	// Test string extraction on multiple test binaries
+	testCases := []struct {
+		version     string
+		filename    string
+		minStrings  int
+		description string
+	}{
+		{"117", "testproject_lin", 100, "Go 1.17 Linux binary"},
+		{"117", "testproject_lin_stripped", 100, "Go 1.17 Linux stripped binary"},
+		{"117", "testproject_mac", 100, "Go 1.17 macOS binary"},
+		{"117", "testproject_win.exe", 100, "Go 1.17 Windows binary"},
+		{"116", "testproject_lin", 100, "Go 1.16 Linux binary"},
+		{"115", "testproject_lin_32", 50, "Go 1.15 Linux 32-bit binary"},
+		{"18", "testproject_mac_stripped", 100, "Go 1.8 macOS stripped binary"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s_%s", tc.version, tc.filename), func(t *testing.T) {
+			filePath := fmt.Sprintf("%s/test/build/%s/%s", workingDirectory, tc.version, tc.filename)
+			if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
+				t.Skipf("Test file %s doesn't exist", filePath)
+				return
+			}
+
+			// Extract with strings enabled
+			data, err := main_impl(filePath, false, false, false, true, 0, "", true)
+			if err != nil {
+				t.Errorf("Failed to extract from %s: %v", tc.description, err)
+				return
+			}
+
+			// Check that strings were extracted
+			if len(data.Strings) == 0 {
+				t.Errorf("No strings extracted from %s", tc.description)
+				return
+			}
+
+			// Check minimum number of strings
+			if len(data.Strings) < tc.minStrings {
+				t.Errorf("Expected at least %d strings from %s, got %d", tc.minStrings, tc.description, len(data.Strings))
+			}
+
+			// Check that all extracted strings are printable
+			nonPrintableCount := 0
+			for _, str := range data.Strings {
+				if !isPrintable(str) {
+					nonPrintableCount++
+				}
+			}
+
+			// Allow up to 5% non-printable strings (some edge cases may exist)
+			maxNonPrintable := len(data.Strings) / 20
+			if nonPrintableCount > maxNonPrintable {
+				t.Errorf("Too many non-printable strings in %s: %d out of %d (max allowed: %d)",
+					tc.description, nonPrintableCount, len(data.Strings), maxNonPrintable)
+			}
+
+			// Check for some expected common Go strings
+			expectedSubstrings := []string{"main", "go", "runtime"}
+			foundCount := 0
+			for _, expected := range expectedSubstrings {
+				for _, str := range data.Strings {
+					if strings.Contains(str, expected) {
+						foundCount++
+						break
+					}
+				}
+			}
+
+			if foundCount == 0 {
+				t.Errorf("No common Go strings found in %s (expected at least one of: %v)", tc.description, expectedSubstrings)
+			}
+
+			t.Logf("%s: extracted %d strings (%d printable)", tc.description, len(data.Strings), len(data.Strings)-nonPrintableCount)
+		})
+	}
 }
