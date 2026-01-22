@@ -735,10 +735,92 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		//     InCount  uint16
 		//     OutCount uint16 // top bit is set if last input parameter is ...
 		//}
-		//inCountAddr := typeAddress + uint64(_type.baseSize)
-		//outCountAddr := typeAddress + uint64(_type.baseSize) + uint64(unsafe.Sizeof(Uint16))
-		// TODO: parse this nicer to get C style args and return
-		(*_type).CStr = "void*"
+		// Read InCount and OutCount
+		inCountAddr := typeAddress + uint64(_type.baseSize)
+		outCountAddr := typeAddress + uint64(_type.baseSize) + 2 // uint16 = 2 bytes
+		
+		inCountData, err := e.raw.read_memory(inCountAddr, 2)
+		if err != nil {
+			(*_type).CStr = "void*"
+			parsedTypesIn.Set(typeAddress, *_type)
+			break
+		}
+		
+		outCountData, err := e.raw.read_memory(outCountAddr, 2)
+		if err != nil {
+			(*_type).CStr = "void*"
+			parsedTypesIn.Set(typeAddress, *_type)
+			break
+		}
+		
+		var inCount, outCount uint16
+		if littleendian {
+			inCount = binary.LittleEndian.Uint16(inCountData)
+			outCount = binary.LittleEndian.Uint16(outCountData)
+		} else {
+			inCount = binary.BigEndian.Uint16(inCountData)
+			outCount = binary.BigEndian.Uint16(outCountData)
+		}
+		
+		// Check for variadic (top bit of outCount)
+		isVariadic := (outCount & 0x8000) != 0
+		outCount = outCount & 0x7FFF
+		
+		// After InCount and OutCount, there's an array of type pointers
+		// Layout: [InCount types...][OutCount types...]
+		paramTypesStart := typeAddress + uint64(_type.baseSize) + 4 // skip InCount + OutCount
+		
+		// Build parameter and return type lists
+		var inTypes, outTypes []string
+		
+		// Parse input parameters
+		for i := uint16(0); i < inCount; i++ {
+			paramTypeAddr, err := e.ReadPointerSizeMem(paramTypesStart+uint64(i)*ptrSize, is64bit, littleendian)
+			if err != nil {
+				continue
+			}
+			parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, paramTypeAddr, is64bit, littleendian, parsedTypesIn)
+			if paramType, found := parsedTypesIn.Get(paramTypeAddr); found {
+				inTypes = append(inTypes, paramType.(Type).CStr)
+			} else {
+				inTypes = append(inTypes, "void*")
+			}
+		}
+		
+		// Parse output (return) parameters
+		for i := uint16(0); i < outCount; i++ {
+			returnTypeAddr, err := e.ReadPointerSizeMem(paramTypesStart+uint64(inCount+i)*ptrSize, is64bit, littleendian)
+			if err != nil {
+				continue
+			}
+			parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, returnTypeAddr, is64bit, littleendian, parsedTypesIn)
+			if returnType, found := parsedTypesIn.Get(returnTypeAddr); found {
+				outTypes = append(outTypes, returnType.(Type).CStr)
+			} else {
+				outTypes = append(outTypes, "void*")
+			}
+		}
+		
+		// Build C function pointer typedef
+		// Format: typedef <return> (*<name>)(<args>);
+		returnStr := "void"
+		if len(outTypes) == 1 {
+			returnStr = outTypes[0]
+		} else if len(outTypes) > 1 {
+			// C doesn't support multiple returns; use a struct or comment
+			returnStr = "void /* multiple returns: " + strings.Join(outTypes, ", ") + " */"
+		}
+		
+		argsStr := strings.Join(inTypes, ", ")
+		if argsStr == "" {
+			argsStr = "void"
+		}
+		if isVariadic && len(inTypes) > 0 {
+			argsStr += ", ..."
+		}
+		
+		(*_type).CStr = _type.CStr + "_funcptr"
+		(*_type).CReconstructed = fmt.Sprintf("typedef %s (*%s)(%s)", returnStr, (*_type).CStr, argsStr)
 		parsedTypesIn.Set(typeAddress, *_type)
 	case Array:
 		// type arraytype struct {

@@ -62,6 +62,19 @@ def set_function_signature(ea, typedef):
     idaapi.apply_type(ea, ida_typeinf.parse_decl(typedef, ida_typeinf.PT_SIL), idaapi.TINFO_DEFINITE)
 
 
+def apply_function_type(ea, func_name, types_dict):
+    """Try to apply function signature from types if available.
+    
+    Note: This is a placeholder for future enhancement.
+    Function type matching would require more sophisticated logic to:
+    1. Extract function signature from function analysis
+    2. Match it against reconstructed function types
+    3. Apply the appropriate type to the function's arguments/locals
+    """
+    # Future enhancement: match function signatures and apply types
+    pass
+
+
 def import_primitives():
     type_map = {
         "BUILTIN_STRING": "string",
@@ -103,6 +116,14 @@ def main(json_file):
         buf = rp.read()
 
     hints = json.loads(buf)
+    
+    # Build a map of types for easy lookup (future use for function signatures)
+    types_by_name = {}
+    if hints.get("Types") and iterable(hints["Types"]):
+        for typ in hints["Types"]:
+            if typ.get("Kind") == "Func" and typ.get("CReconstructed"):
+                types_by_name[typ.get("Str", "")] = typ
+    
     if iterable(hints["UserFunctions"]):
         for func in hints["UserFunctions"]:
             ida_bytes.del_items(func["Start"])
