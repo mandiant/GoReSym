@@ -524,7 +524,17 @@ func (f *peFile) dwarf() (*dwarf.Data, error) {
 
 // iterateSections calls the provided function for each section.
 // This avoids loading all section data into memory at once.
+// Section addresses are full VAs (ImageBase + VirtualAddress) so that
+// pointer values found in the binary data can be compared directly.
 func (f *peFile) iterateSections(fn func(Section) error) error {
+	var imageBase uint64
+	switch oh := f.pe.OptionalHeader.(type) {
+	case *pe.OptionalHeader32:
+		imageBase = uint64(oh.ImageBase)
+	case *pe.OptionalHeader64:
+		imageBase = oh.ImageBase
+	}
+
 	for _, sec := range f.pe.Sections {
 		data, err := sec.Data()
 		if err != nil {
@@ -533,7 +543,7 @@ func (f *peFile) iterateSections(fn func(Section) error) error {
 		}
 		section := Section{
 			Name: sec.Name,
-			Addr: uint64(sec.VirtualAddress),
+			Addr: imageBase + uint64(sec.VirtualAddress),
 			Data: data,
 		}
 		if err := fn(section); err != nil {
