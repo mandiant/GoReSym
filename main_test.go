@@ -30,7 +30,7 @@ func TestAllVersions(t *testing.T) {
 			}
 
 			t.Run(versionPath, func(t *testing.T) {
-				data, err := main_impl(filePath, true, true, true, false, 0, "", false)
+				data, err := main_impl(filePath, true, true, true, false, 0, "", true)
 				if err != nil {
 					t.Errorf("Go %s failed on %s: %s", v, file, err)
 				}
@@ -106,6 +106,10 @@ func TestAllVersions(t *testing.T) {
 
 				if data.Arch == "" {
 					t.Errorf("Go %s Arch failed on %s: %s", v, file, err)
+				}
+
+				if len(data.Strings) == 0 {
+					t.Errorf("Go %s Strings failed on %s: %s", v, file, err)
 				}
 			})
 		}
