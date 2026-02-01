@@ -824,6 +824,9 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		returnCStr := "void"
 		if len(outTypesC) == 1 {
 			returnCStr = outTypesC[0]
+		} else if len(outTypesC) > 1 {
+			// Multiple returns - use tuple syntax like CReconstructed
+			returnCStr = "tuple(" + strings.Join(outTypesC, ", ") + ")"
 		}
 
 		argsCStr := strings.Join(inTypesC, ", ")
