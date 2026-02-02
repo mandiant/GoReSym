@@ -238,10 +238,10 @@ func TestIsDataSection(t *testing.T) {
 		{"__noptrdata", true},
 		// PE sections
 		{".rdata", true},
+		{".text", true}, // Included for old Go Windows binaries (1.7-1.10) that store strings in .text
 		// Suffixed variants (some formats append .__)
 		{".rodata.__", true},
 		// Non-data sections
-		{".text", false},
 		{".bss", false},
 		{"__TEXT", false},
 		{".got", false},

@@ -32,6 +32,7 @@ import (
 )
 
 const minStringLength = 4
+const maxReasonableStringLength = 65536 // 64KB - no real Go string should exceed this
 
 // StringCandidate represents a potential Go string structure found in the binary.
 // Go strings are represented as a struct with a pointer and length:
@@ -251,7 +252,7 @@ func isDataSection(name string) bool {
 	dataNames := []string{
 		".rodata", ".data", ".noptrdata", // ELF
 		"__rodata", "__data", "__noptrdata", // Mach-O
-		".rdata", // PE
+		".rdata", ".text", // PE (.text needed for old Go 1.7-1.10 Windows binaries)
 	}
 	for _, dataName := range dataNames {
 		if name == dataName || name == dataName+".__" {
@@ -310,6 +311,12 @@ func findStringCandidates(data []byte, baseAddr uint64, is64bit bool, isLittleEn
 
 		// FLOSS: if length > limit (max section size), skip
 		if length > maxSectionSize {
+			continue
+		}
+
+		// Additional sanity check: reject unreasonably large strings
+		// Real Go strings rarely exceed 64KB; larger values are likely garbage
+		if length > maxReasonableStringLength {
 			continue
 		}
 
