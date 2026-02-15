@@ -440,3 +440,21 @@ func (f *machoFile) iterateSections(fn func(Section) error) error {
 	}
 	return nil
 }
+
+// is64Bit returns true if this is a 64-bit Mach-O binary.
+// Go's debug/macho package represents CPU type directly on the File struct.
+func (f *machoFile) is64Bit() bool {
+	switch f.macho.Cpu {
+	case macho.CpuAmd64, macho.CpuArm64:
+		return true
+	default:
+		return false // CpuI386, CpuArm, CpuPpc = 32-bit
+	}
+}
+
+// isLittleEndian returns true if this Mach-O binary is little-endian.
+// Modern Macs (x86-64, ARM64) are little-endian.
+// Old PowerPC Macs were big-endian.
+func (f *machoFile) isLittleEndian() bool {
+	return f.macho.ByteOrder == binary.LittleEndian
+}

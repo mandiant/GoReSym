@@ -441,7 +441,10 @@ func findStringBlobRange(candidates []StringCandidate, runStart, runEnd int, sec
 	// FLOSS: prev_null = section_data.rfind(b"\x00\x00\x00\x00", 0, instance_offset)
 	prevNull := bytes.LastIndex(section.Data[:instanceOffset], nullNeedle)
 	if prevNull == -1 {
-		return 0, 0, nil
+		// String blob starts at the beginning of the section.
+		// This happens in newer Go/macOS (Go 1.22+) where Apple's linker
+		// packs sections without leading padding.
+		prevNull = 0
 	}
 
 	// Convert section-relative offsets to VAs
