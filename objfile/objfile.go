@@ -735,10 +735,149 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		//     InCount  uint16
 		//     OutCount uint16 // top bit is set if last input parameter is ...
 		//}
-		//inCountAddr := typeAddress + uint64(_type.baseSize)
-		//outCountAddr := typeAddress + uint64(_type.baseSize) + uint64(unsafe.Sizeof(Uint16))
-		// TODO: parse this nicer to get C style args and return
-		(*_type).CStr = "void*"
+		// Read InCount and OutCount
+		inCountAddr := typeAddress + uint64(_type.baseSize)
+		outCountAddr := typeAddress + uint64(_type.baseSize) + 2 // uint16 = 2 bytes
+		
+		inCountData, err := e.raw.read_memory(inCountAddr, 2)
+		if err != nil {
+			(*_type).CStr = "void*"
+			parsedTypesIn.Set(typeAddress, *_type)
+			break
+		}
+		
+		outCountData, err := e.raw.read_memory(outCountAddr, 2)
+		if err != nil {
+			(*_type).CStr = "void*"
+			parsedTypesIn.Set(typeAddress, *_type)
+			break
+		}
+		
+		var inCount, outCount uint16
+		if littleendian {
+			inCount = binary.LittleEndian.Uint16(inCountData)
+			outCount = binary.LittleEndian.Uint16(outCountData)
+		} else {
+			inCount = binary.BigEndian.Uint16(inCountData)
+			outCount = binary.BigEndian.Uint16(outCountData)
+		}
+		
+		// Check for variadic (top bit of outCount)
+		isVariadic := (outCount & 0x8000) != 0
+		outCount = outCount & 0x7FFF
+		
+		// After InCount and OutCount, there's an array of type pointers
+		// Layout: [InCount types...][OutCount types...]
+		//
+		// Go runtime funcType.in() uses: uadd := unsafe.Sizeof(*t)
+		//   sizeof(funcType) = baseSize + roundUp(4, ptrSize) = baseSize + ptrSize
+		//   On 64-bit: baseSize(48) + 8 = 56  (4 bytes data + 4 bytes padding)
+		//   On 32-bit: baseSize(32) + 4 = 36  (4 bytes data, already aligned)
+		// If tflagUncommon is set, skip sizeof(uncommonType) = 16 bytes
+		paramTypesStart := typeAddress + uint64(_type.baseSize) + ptrSize
+		if _type.flags&tflagUncommon != 0 {
+			paramTypesStart += 16 // sizeof(uncommonType) in Go 1.7+
+		}
+
+		// Build parameter and return type lists
+		// Collect both Go-style (.Str) and C-style (.CStr) names
+		var inTypesC, outTypesC []string
+		var inTypesGo, outTypesGo []string
+
+		// Parse input parameters
+		for i := uint16(0); i < inCount; i++ {
+			paramTypeAddr, err := e.ReadPointerSizeMem(paramTypesStart+uint64(i)*ptrSize, is64bit, littleendian)
+			if err != nil {
+				inTypesC = append(inTypesC, "void*")
+				inTypesGo = append(inTypesGo, "unknown")
+				continue
+			}
+			parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, paramTypeAddr, is64bit, littleendian, parsedTypesIn)
+			if paramType, found := parsedTypesIn.Get(paramTypeAddr); found {
+				inTypesC = append(inTypesC, paramType.(Type).CStr)
+				inTypesGo = append(inTypesGo, paramType.(Type).Str)
+			} else {
+				inTypesC = append(inTypesC, "void*")
+				inTypesGo = append(inTypesGo, "unknown")
+			}
+		}
+
+		// Parse output (return) parameters
+		for i := uint16(0); i < outCount; i++ {
+			returnTypeAddr, err := e.ReadPointerSizeMem(paramTypesStart+uint64(inCount+i)*ptrSize, is64bit, littleendian)
+			if err != nil {
+				outTypesC = append(outTypesC, "void*")
+				outTypesGo = append(outTypesGo, "unknown")
+				continue
+			}
+			parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, returnTypeAddr, is64bit, littleendian, parsedTypesIn)
+			if returnType, found := parsedTypesIn.Get(returnTypeAddr); found {
+				outTypesC = append(outTypesC, returnType.(Type).CStr)
+				outTypesGo = append(outTypesGo, returnType.(Type).Str)
+			} else {
+				outTypesC = append(outTypesC, "void*")
+				outTypesGo = append(outTypesGo, "unknown")
+			}
+		}
+
+		// --- CStr: "returnType (param1, param2)" ---
+		returnCStr := "void"
+		if len(outTypesC) == 1 {
+			returnCStr = outTypesC[0]
+		} else if len(outTypesC) > 1 {
+			// Multiple returns - use tuple syntax like CReconstructed
+			returnCStr = "tuple(" + strings.Join(outTypesC, ", ") + ")"
+		}
+
+		argsCStr := strings.Join(inTypesC, ", ")
+		if argsCStr == "" {
+			argsCStr = "void"
+		}
+		if isVariadic && len(inTypesC) > 0 {
+			argsCStr += ", ..."
+		}
+
+		// Save original CStr (the C-safe type name) before overwriting
+		origCStr := _type.CStr
+
+		(*_type).CStr = returnCStr + " (" + argsCStr + ")"
+
+		// --- Reconstructed: Go syntax ---
+		argsGoStr := strings.Join(inTypesGo, ", ")
+		returnGoStr := ""
+		if len(outTypesGo) == 1 {
+			returnGoStr = outTypesGo[0]
+		} else if len(outTypesGo) > 1 {
+			returnGoStr = "(" + strings.Join(outTypesGo, ", ") + ")"
+		}
+
+		funcSig := "func(" + argsGoStr + ")"
+		if returnGoStr != "" {
+			funcSig += " " + returnGoStr
+		}
+		if _type.flags&tflagNamed != 0 {
+			(*_type).Reconstructed = "type " + _type.Str + " " + funcSig
+		} else {
+			(*_type).Reconstructed = funcSig
+		}
+
+		// --- CReconstructed: "typedef <return> (*<name>_funcptr)(<args>)" ---
+		// Build a clean C identifier for the funcptr name from the original CStr
+		funcPtrName := strings.NewReplacer(
+			"(", "_", ")", "_", ",", "_",
+		).Replace(origCStr)
+		for strings.Contains(funcPtrName, "__") {
+			funcPtrName = strings.ReplaceAll(funcPtrName, "__", "_")
+		}
+		funcPtrName = strings.TrimRight(funcPtrName, "_") + "_funcptr"
+
+		cReturnStr := returnCStr
+		if len(outTypesC) > 1 {
+			// IDA tuple syntax for multiple return values
+			cReturnStr = "tuple(" + strings.Join(outTypesC, ", ") + ")"
+		}
+
+		(*_type).CReconstructed = fmt.Sprintf("typedef %s (*%s)(%s)", cReturnStr, funcPtrName, argsCStr)
 		parsedTypesIn.Set(typeAddress, *_type)
 	case Array:
 		// type arraytype struct {
