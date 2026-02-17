@@ -6,7 +6,7 @@ for v in "${versions[@]}"
 do
     GO_TAG=$v
     GO_VER=$(echo "$GO_TAG" | tr -d '.')
-    mkdir -p $(pwd)/test/build/"$ver"/
+    mkdir -p $(pwd)/test/build/"$GO_VER"/
 	
     rm -f Dockerfile.test
 cat <<EOF >Dockerfile.test

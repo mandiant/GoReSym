@@ -521,3 +521,50 @@ func (f *peFile) loadAddress() (uint64, error) {
 func (f *peFile) dwarf() (*dwarf.Data, error) {
 	return f.pe.DWARF()
 }
+
+// iterateSections calls the provided function for each section.
+// This avoids loading all section data into memory at once.
+// Section addresses are full VAs (ImageBase + VirtualAddress) so that
+// pointer values found in the binary data can be compared directly.
+func (f *peFile) iterateSections(fn func(Section) error) error {
+	var imageBase uint64
+	switch oh := f.pe.OptionalHeader.(type) {
+	case *pe.OptionalHeader32:
+		imageBase = uint64(oh.ImageBase)
+	case *pe.OptionalHeader64:
+		imageBase = oh.ImageBase
+	}
+
+	for _, sec := range f.pe.Sections {
+		data, err := sec.Data()
+		if err != nil {
+			// Skip sections we can't read
+			continue
+		}
+		section := Section{
+			Name: sec.Name,
+			Addr: imageBase + uint64(sec.VirtualAddress),
+			Data: data,
+		}
+		if err := fn(section); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// is64Bit returns true if this is a 64-bit PE file
+func (f *peFile) is64Bit() bool {
+	switch f.pe.OptionalHeader.(type) {
+	case *pe.OptionalHeader64:
+		return true
+	default:
+		return false
+	}
+}
+
+// isLittleEndian returns true if this is a little-endian PE file
+// PE files are always little-endian on x86/x64/ARM architectures
+func (f *peFile) isLittleEndian() bool {
+	return true
+}

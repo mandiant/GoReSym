@@ -64,9 +64,10 @@ type ExtractMetadata struct {
 	Files         []string
 	UserFunctions []FuncMetadata
 	StdFunctions  []FuncMetadata
+	Strings       []string
 }
 
-func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string, printStrings bool) (metadata ExtractMetadata, err error) {
 	tmpFile, err := os.CreateTemp(os.TempDir(), "goresym_tmp-")
 	if err != nil {
 		return ExtractMetadata{}, fmt.Errorf("failed to create temporary file: %s", err)
@@ -81,10 +82,10 @@ func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool,
 		return ExtractMetadata{}, fmt.Errorf("failed to close temporary file: %s", err)
 	}
 
-	return main_impl(tmpFile.Name(), printStdPkgs, printFilePaths, printTypes, noPrintFunctions, manualTypeAddress, versionOverride)
+	return main_impl(tmpFile.Name(), printStdPkgs, printFilePaths, printTypes, noPrintFunctions, manualTypeAddress, versionOverride, printStrings)
 }
 
-func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string) (metadata ExtractMetadata, err error) {
+func main_impl(fileName string, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string, printStrings bool) (metadata ExtractMetadata, err error) {
 	extractMetadata := ExtractMetadata{}
 
 	file, err := objfile.Open(fileName)
@@ -287,6 +288,14 @@ restartParseWithRealTextBase:
 		}
 	}
 
+	if printStrings {
+		strings, err := file.ExtractStrings()
+		if err == nil {
+			extractMetadata.Strings = strings
+		}
+		// If error, Strings will remain empty (nil slice)
+	}
+
 	if !noPrintFunctions {
 		for _, elem := range finalTab.ParsedPclntab.Funcs {
 			if isStdPackage(elem.PackageName()) {
@@ -376,6 +385,15 @@ func printForHuman(metadata ExtractMetadata) {
 		fmt.Println("<NO FILES EXTRACTED>")
 	}
 
+	fmt.Println("\n-Strings-")
+	if len(metadata.Strings) > 0 {
+		for _, str := range metadata.Strings {
+			fmt.Println(str)
+		}
+	} else {
+		fmt.Println("<NO STRINGS EXTRACTED>")
+	}
+
 	fmt.Println("\n-User Functions-")
 	if len(metadata.UserFunctions) > 0 {
 		for i, fn := range metadata.UserFunctions {
@@ -431,6 +449,7 @@ func main() {
 	typeAddress := flag.Int("m", 0, "Manually parse the RTYPE at the provided virtual address, disables automated enumeration of moduledata typelinks itablinks")
 	versionOverride := flag.String("v", "", "Override the automated version detection, ex: 1.17. If this is wrong, parsing may fail or produce nonsense")
 	humanView := flag.Bool("human", false, "Human view, print information flat rather than json, some information is omitted for clarity")
+	printStrings := flag.Bool("strings", false, "Extract embedded Go strings from binary")
 	flag.Parse()
 
 	if *about {
@@ -449,7 +468,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	metadata, err := main_impl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *noPrintFunctions, *typeAddress, *versionOverride)
+	metadata, err := main_impl(flag.Arg(0), *printStdPkgs, *printFilePaths, *printTypes, *noPrintFunctions, *typeAddress, *versionOverride, *printStrings)
 	if err != nil {
 		fmt.Println(TextToJson("error", fmt.Sprintf("Failed to parse file: %s", err)))
 		os.Exit(1)

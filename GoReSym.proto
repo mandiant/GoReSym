@@ -74,4 +74,5 @@ message ExtractMetadata {
     repeated string files = 10 [json_name="Files"];
     repeated FuncMetadata userFunctions = 11 [json_name="UserFunctions"];
     repeated FuncMetadata stdFunctions = 12 [json_name="StdFunctions"];
+    repeated string strings = 13 [json_name="Strings"];
 }

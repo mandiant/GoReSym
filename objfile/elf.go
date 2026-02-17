@@ -425,3 +425,34 @@ func (f *elfFile) loadAddress() (uint64, error) {
 func (f *elfFile) dwarf() (*dwarf.Data, error) {
 	return f.elf.DWARF()
 }
+
+// iterateSections calls the provided function for each section.
+// This avoids loading all section data into memory at once.
+func (f *elfFile) iterateSections(fn func(Section) error) error {
+	for _, sec := range f.elf.Sections {
+		data, err := sec.Data()
+		if err != nil {
+			// Skip sections we can't read
+			continue
+		}
+		section := Section{
+			Name: sec.Name,
+			Addr: sec.Addr,
+			Data: data,
+		}
+		if err := fn(section); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// is64Bit returns true if this is a 64-bit ELF file
+func (f *elfFile) is64Bit() bool {
+	return f.elf.Class == elf.ELFCLASS64
+}
+
+// isLittleEndian returns true if this is a little-endian ELF file
+func (f *elfFile) isLittleEndian() bool {
+	return f.elf.Data == elf.ELFDATA2LSB
+}
