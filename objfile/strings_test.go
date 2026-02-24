@@ -8,7 +8,7 @@ import (
 // TestExtractStrings_ELF tests string extraction from an ELF binary (Linux)
 func TestExtractStrings_ELF(t *testing.T) {
 	testBinary := filepath.Join("..", "testproject", "testproject")
-	
+
 	file, err := Open(testBinary)
 	if err != nil {
 		t.Skipf("Could not open test binary: %v (run: cd testproject && go build)", err)
@@ -33,7 +33,7 @@ func TestExtractStrings_ELF(t *testing.T) {
 // TestExtractStrings_PE tests string extraction from a PE binary (Windows)
 func TestExtractStrings_PE(t *testing.T) {
 	testBinary := filepath.Join("..", "testproject", "testproject.exe")
-	
+
 	file, err := Open(testBinary)
 	if err != nil {
 		t.Skipf("Could not open Windows test binary: %v (run: cd testproject && GOOS=windows GOARCH=amd64 go build -o testproject.exe)", err)
@@ -101,13 +101,13 @@ func TestIsFullyPrintable(t *testing.T) {
 	}{
 		{"hello world", true},
 		{"runtime.error", true},
-		{"line1\nline2", true},          // newlines are allowed
-		{"col1\tcol2", true},            // tabs are allowed
-		{"windows\r\n", true},           // carriage return allowed
-		{"\x00\x01\x02\x03", false},    // all non-printable
-		{"abc\x00\x01", false},          // any non-printable fails (was 80% threshold)
-		{"mostly ok \x01", false},       // even one non-printable byte fails
-		{"", false},                     // empty string
+		{"line1\nline2", true},      // newlines are allowed
+		{"col1\tcol2", true},        // tabs are allowed
+		{"windows\r\n", true},       // carriage return allowed
+		{"\x00\x01\x02\x03", false}, // all non-printable
+		{"abc\x00\x01", false},      // any non-printable fails (was 80% threshold)
+		{"mostly ok \x01", false},   // even one non-printable byte fails
+		{"", false},                 // empty string
 	}
 
 	for _, tt := range tests {
@@ -121,7 +121,7 @@ func TestIsFullyPrintable(t *testing.T) {
 // TestExtractStrings_MinLength validates minimum length filtering
 func TestExtractStrings_MinLength(t *testing.T) {
 	testBinary := filepath.Join("..", "testproject", "testproject")
-	
+
 	file, err := Open(testBinary)
 	if err != nil {
 		t.Skip("Test binary not available")
