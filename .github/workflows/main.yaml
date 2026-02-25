@@ -3,6 +3,33 @@ name: Build All
 on: [push, pull_request]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.1.1
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.0.0
+      with:
+        go-version: '>=1.21.0'
+    - name: Check formatting
+      run: test -z "$(gofmt -l .)"
+    - name: Check vet
+      run: go vet ./...
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.1.1
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.0.0
+      with:
+        go-version: '>=1.21.0'
+    - name: Build test binaries
+      run: bash build_test_files.sh
+    - name: Run tests
+      run: go test ./...
+
   build:
     runs-on: windows-latest
     permissions:

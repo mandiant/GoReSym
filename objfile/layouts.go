@@ -11,26 +11,26 @@ type FieldName uint8
 
 const (
 	// ModuleData fields
-	FieldFtab FieldName = iota          // 0
-	FieldMinpc                           // 1
-	FieldText                            // 2
-	FieldTypes                           // 3
-	FieldEtypes                          // 4
-	FieldTextsectmap                     // 5
-	FieldTypelinks                       // 6
-	FieldItablinks                       // 7
-	FieldPkgPath                         // 8 (for Interface)
-	FieldMethods                         // 9 (for Interface)
+	FieldFtab        FieldName = iota // 0
+	FieldMinpc                        // 1
+	FieldText                         // 2
+	FieldTypes                        // 3
+	FieldEtypes                       // 4
+	FieldTextsectmap                  // 5
+	FieldTypelinks                    // 6
+	FieldItablinks                    // 7
+	FieldPkgPath                      // 8 (for Interface)
+	FieldMethods                      // 9 (for Interface)
 	// Rtype fields (Go reflection types)
-	FieldSize                            // 10
-	FieldPtrdata                         // 11
-	FieldHash                            // 12
-	FieldUnused                          // 13
-	FieldAlign                           // 14
-	FieldFieldAlign                      // 15
-	FieldKind                            // 16
-	FieldStr                             // 17
-	FieldTflag                           // 18
+	FieldSize       // 10
+	FieldPtrdata    // 11
+	FieldHash       // 12
+	FieldUnused     // 13
+	FieldAlign      // 14
+	FieldFieldAlign // 15
+	FieldKind       // 16
+	FieldStr        // 17
+	FieldTflag      // 18
 )
 
 // String representation for debugging/logging
@@ -83,14 +83,14 @@ func (f FieldName) String() string {
 type FieldType uint8
 
 const (
-	FieldTypePvoid FieldType = iota  // 0 - pointer/address (void *)
-	FieldTypeSlice                    // 1 - Go slice (ptr, len, cap)
-	FieldTypeString                   // 2 - Go string (ptr, len)
-	FieldTypeInt                      // 3 - integer value
-	FieldTypeName                     // 4 - name offset (Go 1.18+)
-	FieldTypeUint32                   // 5 - unsigned 32-bit integer
-	FieldTypeUint8                    // 6 - unsigned 8-bit integer
-	FieldTypeInt32                    // 7 - signed 32-bit integer
+	FieldTypePvoid  FieldType = iota // 0 - pointer/address (void *)
+	FieldTypeSlice                   // 1 - Go slice (ptr, len, cap)
+	FieldTypeString                  // 2 - Go string (ptr, len)
+	FieldTypeInt                     // 3 - integer value
+	FieldTypeName                    // 4 - name offset (Go 1.18+)
+	FieldTypeUint32                  // 5 - unsigned 32-bit integer
+	FieldTypeUint8                   // 6 - unsigned 8-bit integer
+	FieldTypeInt32                   // 7 - signed 32-bit integer
 )
 
 // String representation for debugging
@@ -167,89 +167,89 @@ var moduleDataLayouts = map[string]*ModuleDataLayout{
 	"1.21": {
 		Version: "1.21",
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 128, Offset32: 64,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 160, Offset32: 80,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 176, Offset32: 88,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 296, Offset32: 148,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 304, Offset32: 152,Type: FieldTypePvoid},
-			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164,Type: FieldTypeSlice},
-			{Name: FieldTypelinks, Offset64: 352, Offset32: 176,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 376, Offset32: 188,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 296, Offset32: 148, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 304, Offset32: 152, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 352, Offset32: 176, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 376, Offset32: 188, Type: FieldTypeSlice},
 		},
 	},
 	"1.20": {
 		Version: "1.20",
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 128, Offset32: 64,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 160, Offset32: 80,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 176, Offset32: 88,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 296, Offset32: 148,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 304, Offset32: 152,Type: FieldTypePvoid},
-			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164,Type: FieldTypeSlice},
-			{Name: FieldTypelinks, Offset64: 352, Offset32: 176,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 376, Offset32: 188,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 296, Offset32: 148, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 304, Offset32: 152, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 352, Offset32: 176, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 376, Offset32: 188, Type: FieldTypeSlice},
 		},
 	},
 	"1.18": {
 		Version: "1.18",
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 128, Offset32: 64,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 160, Offset32: 80,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 176, Offset32: 88,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 280, Offset32: 140,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 288, Offset32: 144,Type: FieldTypePvoid},
-			{Name: FieldTextsectmap, Offset64: 312, Offset32: 156,Type: FieldTypeSlice},
-			{Name: FieldTypelinks, Offset64: 336, Offset32: 168,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 360, Offset32: 180,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 280, Offset32: 140, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 288, Offset32: 144, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 312, Offset32: 156, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 336, Offset32: 168, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 360, Offset32: 180, Type: FieldTypeSlice},
 		},
 	},
 	"1.16": {
 		Version: "1.16",
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 128, Offset32: 64,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 160, Offset32: 80,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 176, Offset32: 88,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 280, Offset32: 140,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 288, Offset32: 144,Type: FieldTypePvoid},
-			{Name: FieldTextsectmap, Offset64: 296, Offset32: 148,Type: FieldTypeSlice},
-			{Name: FieldTypelinks, Offset64: 320, Offset32: 160,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 344, Offset32: 172,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 280, Offset32: 140, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 288, Offset32: 144, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 296, Offset32: 148, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 320, Offset32: 160, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 344, Offset32: 172, Type: FieldTypeSlice},
 		},
 	},
 	// Legacy Go versions (1.2-1.15)
 	"1.8": {
 		Version: "1.8", // Go 1.8-1.15 (ModuleData12_64/32)
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 24, Offset32: 12,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 80, Offset32: 40,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 96, Offset32: 48,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 200, Offset32: 100,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 208, Offset32: 104,Type: FieldTypePvoid},
-			{Name: FieldTextsectmap, Offset64: 216, Offset32: 108,Type: FieldTypeSlice},
-			{Name: FieldTypelinks, Offset64: 240, Offset32: 120,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 264, Offset32: 132,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 24, Offset32: 12, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 80, Offset32: 40, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 96, Offset32: 48, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 200, Offset32: 100, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 208, Offset32: 104, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 216, Offset32: 108, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 240, Offset32: 120, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 264, Offset32: 132, Type: FieldTypeSlice},
 		},
 	},
 	"1.7": {
 		Version: "1.7", // Go 1.7 (ModuleData12_r17_64/32)
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 24, Offset32: 12,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 80, Offset32: 40,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 96, Offset32: 48,Type: FieldTypePvoid},
-			{Name: FieldTypes, Offset64: 200, Offset32: 100,Type: FieldTypePvoid},
-			{Name: FieldEtypes, Offset64: 208, Offset32: 104,Type: FieldTypePvoid},
-			{Name: FieldTypelinks, Offset64: 216, Offset32: 108,Type: FieldTypeSlice},
-			{Name: FieldItablinks, Offset64: 240, Offset32: 120,Type: FieldTypeSlice},
+			{Name: FieldFtab, Offset64: 24, Offset32: 12, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 80, Offset32: 40, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 96, Offset32: 48, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 200, Offset32: 100, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 208, Offset32: 104, Type: FieldTypePvoid},
+			{Name: FieldTypelinks, Offset64: 216, Offset32: 108, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 240, Offset32: 120, Type: FieldTypeSlice},
 		},
 	},
 	"1.5": {
 		Version: "1.5", // Go 1.5-1.6 (ModuleData12_r15_r16_64/32)
 		Fields: []FieldInfo{
-			{Name: FieldFtab, Offset64: 24, Offset32: 12,Type: FieldTypeSlice},
-			{Name: FieldMinpc, Offset64: 80, Offset32: 40,Type: FieldTypePvoid},
-			{Name: FieldText, Offset64: 96, Offset32: 48,Type: FieldTypePvoid},
+			{Name: FieldFtab, Offset64: 24, Offset32: 12, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 80, Offset32: 40, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 96, Offset32: 48, Type: FieldTypePvoid},
 			// Note: No Types/Etypes/Itablinks for 1.5-1.6
-			{Name: FieldTypelinks, Offset64: 200, Offset32: 100,Type: FieldTypeSlice}, // Legacy format
+			{Name: FieldTypelinks, Offset64: 200, Offset32: 100, Type: FieldTypeSlice}, // Legacy format
 		},
 	},
 }
@@ -900,17 +900,17 @@ func getRtypeFieldOffset(layout *RtypeLayout, fieldName FieldName, is64bit bool)
 type InterfaceMethodsFormat uint8
 
 const (
-	IFMethodsPre17 InterfaceMethodsFormat = iota // 1.5-1.6: pointers in imethod
-	IFMethodsPost17                              // 1.7+: nameOff/typeOff in IMethod
+	IFMethodsPre17  InterfaceMethodsFormat = iota // 1.5-1.6: pointers in imethod
+	IFMethodsPost17                               // 1.7+: nameOff/typeOff in IMethod
 )
 
 // InterfaceLayout describes offsets relative to the rtype base for interfaceType
 // MethodsOffsetPtrs is the number of pointer-size units after base where the methods slice resides
 // PkgPathOffsetPtrs is the number of pointer-size units after base for pkgPath (or -1 if absent)
 type InterfaceLayout struct {
-	MethodsOffsetPtrs  int
-	PkgPathOffsetPtrs  int // -1 if not present
-	MethodsFormat      InterfaceMethodsFormat
+	MethodsOffsetPtrs int
+	PkgPathOffsetPtrs int // -1 if not present
+	MethodsFormat     InterfaceMethodsFormat
 }
 
 // getInterfaceLayout returns the interface layout info for a Go runtime version
@@ -925,7 +925,7 @@ func getInterfaceLayout(version string) *InterfaceLayout {
 	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14",
 		"1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24":
 		return &InterfaceLayout{
-			MethodsOffsetPtrs: 1,  // pkgPath at +0, methods slice at +1
+			MethodsOffsetPtrs: 1, // pkgPath at +0, methods slice at +1
 			PkgPathOffsetPtrs: 0,
 			MethodsFormat:     IFMethodsPost17,
 		}

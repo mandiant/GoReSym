@@ -236,7 +236,7 @@ func TestParseModuleDataGeneric_BackwardCompatibility(t *testing.T) {
 // TestVersionMapping verifies that version aliases work correctly
 func TestVersionMapping(t *testing.T) {
 	testCases := []struct {
-		version          string
+		version           string
 		expectedLayoutVer string
 	}{
 		{"1.21", "1.21"},
