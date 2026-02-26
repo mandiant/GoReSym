@@ -264,7 +264,8 @@ func (t *LineTable) parsePclnTab(versionOverride string) {
 	t.Version = possibleVersion
 
 	if len(versionOverride) > 0 {
-		if strings.Contains(versionOverride, "1.24") ||
+		if strings.Contains(versionOverride, "1.25") ||
+			strings.Contains(versionOverride, "1.24") ||
 			strings.Contains(versionOverride, "1.23") ||
 			strings.Contains(versionOverride, "1.22") ||
 			strings.Contains(versionOverride, "1.21") {

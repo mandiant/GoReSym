@@ -288,6 +288,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		// with some higher versions using the same layout as versions before it.
 		switch version {
 		// Refactored: Go 1.16-1.24 use generic parser with layout tables
+		case "1.25":
+			fallthrough
 		case "1.24":
 			fallthrough
 		case "1.23":
@@ -544,6 +546,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.23":
 		fallthrough
 	case "1.24":
+		fallthrough
+	case "1.25":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -1006,6 +1010,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.23":
 			fallthrough
 		case "1.24":
+			fallthrough
+		case "1.25":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1175,6 +1181,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.23":
 			fallthrough
 		case "1.24":
+			fallthrough
+		case "1.25":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer

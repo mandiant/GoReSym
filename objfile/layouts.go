@@ -137,7 +137,7 @@ func getModuleDataLayout(version string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
 	layoutName := version
 	switch version {
-	case "1.24", "1.23", "1.22", "1.21":
+	case "1.25", "1.24", "1.23", "1.22", "1.21":
 		layoutName = "1.21"
 	case "1.20":
 		layoutName = "1.20"
@@ -713,7 +713,7 @@ func getRtypeLayout(runtimeVersion string) *RtypeLayout {
 		layoutName = "1.7"
 	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19":
 		layoutName = "1.14"
-	case "1.20", "1.21", "1.22", "1.23", "1.24":
+	case "1.20", "1.21", "1.22", "1.23", "1.24", "1.25":
 		layoutName = "1.20"
 	default:
 		return nil
@@ -923,7 +923,7 @@ func getInterfaceLayout(version string) *InterfaceLayout {
 			MethodsFormat:     IFMethodsPre17,
 		}
 	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14",
-		"1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24":
+		"1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24", "1.25":
 		return &InterfaceLayout{
 			MethodsOffsetPtrs: 1, // pkgPath at +0, methods slice at +1
 			PkgPathOffsetPtrs: 0,
