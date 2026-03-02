@@ -64,7 +64,7 @@ type ExtractMetadata struct {
 	Files         []string
 	UserFunctions []FuncMetadata
 	StdFunctions  []FuncMetadata
-	Strings       []string
+	Strings       []objfile.GoString
 }
 
 func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string, printStrings bool) (metadata ExtractMetadata, err error) {
