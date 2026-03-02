@@ -133,10 +133,10 @@ type ModuleDataLayout struct {
 
 // getModuleDataLayout returns the layout for a given Go version
 // Multiple versions may share the same layout
-func getModuleDataLayout(version string) *ModuleDataLayout {
+func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
-	layoutName := version
-	switch version {
+	layoutName := runtimeVersion
+	switch runtimeVersion {
 	case "1.25", "1.24", "1.23", "1.22", "1.21":
 		layoutName = "1.21"
 	case "1.20":
@@ -322,8 +322,8 @@ type ModuleDataIntermediate struct {
 
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
 // This replaces the version-specific switch statements with a generic approach
-func parseModuleDataGeneric(rawData []byte, version string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
-	layout := getModuleDataLayout(version)
+func parseModuleDataGeneric(rawData []byte, runtimeVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
+	layout := getModuleDataLayout(runtimeVersion)
 
 	md := &ModuleDataIntermediate{}
 
@@ -488,7 +488,6 @@ func (e *Entry) validateAndConvertModuleData(
 func (e *Entry) validateAndConvertModuleData_116(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -551,7 +550,6 @@ func (e *Entry) validateAndConvertModuleData_116(
 func (e *Entry) validateAndConvertModuleData_Legacy(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -614,7 +612,6 @@ func (e *Entry) validateAndConvertModuleData_Legacy(
 func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,

@@ -261,7 +261,7 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 	return ch, nil
 }
 
-func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
+func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutVersion string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
 	moduleData = &ModuleData{}
 	// Major version only, 1.15.5 -> 1.15
 	parts := strings.Split(runtimeVersion, ".")
@@ -286,16 +286,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
-		switch version {
-		// Refactored: Go 1.16-1.24 use generic parser with layout tables
-		case "1.25":
-			fallthrough
-		case "1.24":
-			fallthrough
-		case "1.23":
-			fallthrough
-		case "1.22":
-			fallthrough
+		switch layoutVersion {
 		case "1.21":
 			fallthrough
 		case "1.20":
@@ -304,7 +295,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			fallthrough
 		case "1.18":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, version, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -313,7 +304,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			result, newIgnorelist, err := e.validateAndConvertModuleData(
 				mdIntermediate,
 				moduleDataCandidate.ModuledataVA,
-				version,
+				layoutVersion,
 				is64bit,
 				littleendian,
 				ignorelist,
@@ -329,7 +320,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			fallthrough
 		case "1.16":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, version, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -338,7 +329,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			result, newIgnorelist, err := e.validateAndConvertModuleData_116(
 				mdIntermediate,
 				moduleDataCandidate.ModuledataVA,
-				version,
 				is64bit,
 				littleendian,
 				ignorelist,
@@ -365,7 +355,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
 					mdIntermediate,
 					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
 					is64bit,
 					littleendian,
 					ignorelist,
@@ -388,7 +377,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
 					mdIntermediate,
 					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
 					is64bit,
 					littleendian,
 					ignorelist,
@@ -411,7 +399,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
 					mdIntermediate,
 					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
 					is64bit,
 					littleendian,
 					ignorelist,
