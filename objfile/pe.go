@@ -402,12 +402,10 @@ scan:
 
 				ignored := false
 				// optionally consult ignore list, to skip past previous (bad) scan results
-				if ignorelist != nil {
-					for _, ignore := range ignorelist {
-						if ignore == secStart+uint64(actual_idx) {
-							ignored = true
-							break
-						}
+				for _, ignore := range ignorelist {
+					if ignore == secStart+uint64(actual_idx) {
+						ignored = true
+						break
 					}
 				}
 				
