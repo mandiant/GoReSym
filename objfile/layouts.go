@@ -457,7 +457,6 @@ func (e *Entry) validateAndConvertModuleData(
 
 		// Validate: functab's first function should equal minpc value
 		if textAddr64(uint64(firstFunc.Entryoffset), md.Text, textsectmap64) != md.Minpc {
-			fmt.Printf("DEBUG 64: md.Minpc=%x, md.Text=%x, firstFunc.Entryoffset=%x, textAddr64=%x\n", md.Minpc, md.Text, firstFunc.Entryoffset, textAddr64(uint64(firstFunc.Entryoffset), md.Text, textsectmap64))
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
@@ -480,7 +479,6 @@ func (e *Entry) validateAndConvertModuleData(
 
 		// Validate: functab's first function should equal minpc value
 		if textAddr32(uint64(firstFunc.Entryoffset), md.Text, textsectmap32) != md.Minpc {
-			fmt.Printf("DEBUG 32: md.Minpc=%x, md.Text=%x, firstFunc.Entryoffset=%x, textAddr32=%x\n", md.Minpc, md.Text, firstFunc.Entryoffset, textAddr32(uint64(firstFunc.Entryoffset), md.Text, textsectmap32))
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
