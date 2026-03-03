@@ -271,7 +271,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 
 	// ModuleData layout changed in 1.26 independently of PCLnTab magic
 	if runtimeVersion == "1.26" {
-		layoutVersion = "1.26"
+		layoutVersion = "1.22"
 	} else if runtimeVersion == "1.25" || runtimeVersion == "1.24" || runtimeVersion == "1.23" || runtimeVersion == "1.22" || runtimeVersion == "1.21" {
 		layoutVersion = "1.21"
 	}
@@ -294,7 +294,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
 		switch layoutVersion {
-		case "1.26":
+		case "1.22":
 			fallthrough
 		case "1.21":
 			fallthrough

@@ -138,7 +138,7 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 	layoutName := runtimeVersion
 	switch runtimeVersion {
 	case "1.26":
-		layoutName = "1.26"
+		layoutName = "1.22"
 	case "1.25", "1.24", "1.23", "1.22", "1.21":
 		layoutName = "1.21"
 	case "1.20":
@@ -158,7 +158,7 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 	layout, exists := moduleDataLayouts[layoutName]
 	if !exists {
 		// Fallback to closest known version
-		return moduleDataLayouts["1.26"]
+		return moduleDataLayouts["1.22"]
 	}
 	return layout
 }
@@ -166,8 +166,8 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 // moduleDataLayouts defines field layouts for different Go versions
 // Only fields that GoReSym actually uses are included
 var moduleDataLayouts = map[string]*ModuleDataLayout{
-	"1.26": {
-		Version: "1.26",
+	"1.22": {
+		Version: "1.22",
 		Fields: []FieldInfo{
 			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
 			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
@@ -337,8 +337,11 @@ type ModuleDataIntermediate struct {
 
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
 // This replaces the version-specific switch statements with a generic approach
-func parseModuleDataGeneric(rawData []byte, runtimeVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
-	layout := getModuleDataLayout(runtimeVersion)
+func parseModuleDataGeneric(rawData []byte, layoutVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
+	layout := moduleDataLayouts[layoutVersion]
+	if layout == nil {
+		layout = getModuleDataLayout(layoutVersion)
+	}
 
 	md := &ModuleDataIntermediate{}
 
