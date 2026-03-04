@@ -391,23 +391,19 @@ scan:
 			}
 		}
 
-		offset := 0
-		for {
-			moduledata_idx_offset := bytes.Index(data[offset:], pclntabVA_bytes)
-			if moduledata_idx_offset != -1 && (offset+moduledata_idx_offset) < int(sec.Size) {
-				actual_idx := offset + moduledata_idx_offset
-				moduledata = data[actual_idx:]
-				moduledata_idx = actual_idx
-				secStart = imageBase + uint64(sec.VirtualAddress)
+		moduledata_idx = bytes.Index(data, pclntabVA_bytes)
+		if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
+			moduledata = data[moduledata_idx:]
+			secStart = imageBase + uint64(sec.VirtualAddress)
 
-				ignored := false
-				// optionally consult ignore list, to skip past previous (bad) scan results
+			// optionally consult ignore list, to skip past previous (bad) scan results
+			if ignorelist != nil {
 				for _, ignore := range ignorelist {
-					if ignore == secStart+uint64(actual_idx) {
-						ignored = true
-						break
+					if ignore == secStart+uint64(moduledata_idx) {
+						continue scan
 					}
 				}
+<<<<<<< HEAD
 
 				if ignored {
 					offset += moduledata_idx_offset + len(pclntabVA_bytes)
@@ -418,7 +414,12 @@ scan:
 				break scan
 			} else {
 				break
+=======
+>>>>>>> 00606f1 (Revert unnecessary moduledata scanning changes in executable parsers)
 			}
+
+			found = true
+			break
 		}
 	}
 
