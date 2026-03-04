@@ -712,24 +712,24 @@ type RtypeIntermediate struct {
 
 // getRtypeLayout returns the layout for a given Go runtime version
 func getRtypeLayout(runtimeVersion string) *RtypeLayout {
-	layoutName := ""
+	rTypeLayout := ""
 
 	switch runtimeVersion {
 	case "1.5":
-		layoutName = "1.5"
+		rTypeLayout = "1.5"
 	case "1.6":
-		layoutName = "1.6"
+		rTypeLayout = "1.6"
 	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13":
-		layoutName = "1.7"
+		rTypeLayout = "1.7"
 	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22":
-		layoutName = "1.14"
+		rTypeLayout = "1.14"
 	case "1.23", "1.24", "1.25", "1.26":
-		layoutName = "1.20"
+		rTypeLayout = "1.20"
 	default:
 		return nil
 	}
 
-	return rtypeLayouts[layoutName]
+	return rtypeLayouts[rTypeLayout]
 }
 
 // rtypeLayouts defines field layouts for different Go runtime type versions
