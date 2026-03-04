@@ -355,12 +355,10 @@ scan:
 					continue
 				}
 			}
-		}
 
 			found = true
 			break
 		}
-	}
 
 	if !found {
 		return nil, fmt.Errorf("moduledata containing section could not be located")
