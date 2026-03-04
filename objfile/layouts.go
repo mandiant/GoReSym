@@ -337,8 +337,11 @@ type ModuleDataIntermediate struct {
 
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
 // This replaces the version-specific switch statements with a generic approach
-func parseModuleDataGeneric(rawData []byte, version string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
-	layout := getModuleDataLayout(version)
+func parseModuleDataGeneric(rawData []byte, layoutVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
+	layout := moduleDataLayouts[layoutVersion]
+	if layout == nil {
+		layout = getModuleDataLayout(layoutVersion)
+	}
 
 	md := &ModuleDataIntermediate{}
 
@@ -412,7 +415,6 @@ func getFieldOffset(layout *ModuleDataLayout, fieldName FieldName, is64bit bool)
 func (e *Entry) validateAndConvertModuleData(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -505,7 +507,6 @@ func (e *Entry) validateAndConvertModuleData(
 func (e *Entry) validateAndConvertModuleData_116(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -568,7 +569,6 @@ func (e *Entry) validateAndConvertModuleData_116(
 func (e *Entry) validateAndConvertModuleData_Legacy(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -631,7 +631,6 @@ func (e *Entry) validateAndConvertModuleData_Legacy(
 func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
