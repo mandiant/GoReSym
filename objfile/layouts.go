@@ -133,10 +133,10 @@ type ModuleDataLayout struct {
 
 // getModuleDataLayout returns the layout for a given Go version
 // Multiple versions may share the same layout
-func getModuleDataLayout(version string) *ModuleDataLayout {
+func getModuleDataLayout(runtimeversion string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
-	layoutName := version
-	switch version {
+	layoutName := runtimeVersion
+	switch runtimeVersion {
 	case "1.26":
 		layoutName = "1.26"
 	case "1.25", "1.24", "1.23", "1.22", "1.21":
