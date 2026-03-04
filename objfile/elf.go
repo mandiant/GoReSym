@@ -354,14 +354,13 @@ scan:
 					offset += moduledata_idx + len(pclntabVA_bytes)
 					continue
 				}
-
-				found = true
-				break scan
-			} else {
-				break
 			}
+
+			found = true
+			break
 		}
 	}
+}
 
 	if !found {
 		return nil, fmt.Errorf("moduledata containing section could not be located")
