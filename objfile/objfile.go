@@ -269,6 +269,13 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		runtimeVersion = parts[0] + "." + parts[1]
 	}
 
+	// ModuleData layout changed in 1.26 independently of PCLnTab magic
+	if runtimeVersion == "1.26" {
+		layoutVersion = "1.26"
+	} else if runtimeVersion == "1.25" || runtimeVersion == "1.24" || runtimeVersion == "1.23" || runtimeVersion == "1.22" || runtimeVersion == "1.21" {
+		layoutVersion = "1.21"
+	}
+	
 	var moduleDataCandidate *ModuleDataCandidate = nil
 
 	const maxattempts = 5
@@ -287,6 +294,8 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
 		switch version {
+		case "1.26":
+			fallthrough
 		// Refactored: Go 1.16-1.24 use generic parser with layout tables
 		case "1.25":
 			fallthrough
@@ -548,6 +557,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.24":
 		fallthrough
 	case "1.25":
+		fallthrough
+	case "1.26":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -1012,6 +1023,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.24":
 			fallthrough
 		case "1.25":
+			fallthrough
+		case "1.26":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1183,6 +1196,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.24":
 			fallthrough
 		case "1.25":
+			fallthrough
+		case "1.26":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer
