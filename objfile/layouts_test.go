@@ -243,6 +243,7 @@ func TestVersionMapping(t *testing.T) {
 		{"1.22", "1.21"}, // 1.22 uses same layout as 1.21
 		{"1.23", "1.21"}, // 1.23 uses same layout as 1.21
 		{"1.24", "1.21"}, // 1.24 uses same layout as 1.21
+		{"1.26", "1.22"}, // 1.26 uses 1.22 layout
 		{"1.25", "1.21"}, // 1.25 uses same layout as 1.21
 		{"1.20", "1.20"},
 		{"1.18", "1.18"},
