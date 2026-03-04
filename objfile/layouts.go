@@ -137,6 +137,8 @@ func getModuleDataLayout(version string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
 	layoutName := version
 	switch version {
+	case "1.26":
+		layoutName = "1.26"
 	case "1.25", "1.24", "1.23", "1.22", "1.21":
 		layoutName = "1.21"
 	case "1.20":
@@ -156,7 +158,7 @@ func getModuleDataLayout(version string) *ModuleDataLayout {
 	layout, exists := moduleDataLayouts[layoutName]
 	if !exists {
 		// Fallback to closest known version
-		return moduleDataLayouts["1.21"]
+		return moduleDataLayouts["1.26"]
 	}
 	return layout
 }
@@ -164,6 +166,19 @@ func getModuleDataLayout(version string) *ModuleDataLayout {
 // moduleDataLayouts defines field layouts for different Go versions
 // Only fields that GoReSym actually uses are included
 var moduleDataLayouts = map[string]*ModuleDataLayout{
+	"1.26": {
+		Version: "1.26",
+		Fields: []FieldInfo{
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 296, Offset32: 148, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 304, Offset32: 152, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 336, Offset32: 168, Type: FieldTypeSlice},
+			{Name: FieldTypelinks, Offset64: 360, Offset32: 180, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 384, Offset32: 192, Type: FieldTypeSlice},
+		},
+	},
 	"1.21": {
 		Version: "1.21",
 		Fields: []FieldInfo{
@@ -442,6 +457,7 @@ func (e *Entry) validateAndConvertModuleData(
 
 		// Validate: functab's first function should equal minpc value
 		if textAddr64(uint64(firstFunc.Entryoffset), md.Text, textsectmap64) != md.Minpc {
+			fmt.Printf("DEBUG 64: md.Minpc=%x, md.Text=%x, firstFunc.Entryoffset=%x, textAddr64=%x\n", md.Minpc, md.Text, firstFunc.Entryoffset, textAddr64(uint64(firstFunc.Entryoffset), md.Text, textsectmap64))
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
@@ -464,6 +480,7 @@ func (e *Entry) validateAndConvertModuleData(
 
 		// Validate: functab's first function should equal minpc value
 		if textAddr32(uint64(firstFunc.Entryoffset), md.Text, textsectmap32) != md.Minpc {
+			fmt.Printf("DEBUG 32: md.Minpc=%x, md.Text=%x, firstFunc.Entryoffset=%x, textAddr32=%x\n", md.Minpc, md.Text, firstFunc.Entryoffset, textAddr32(uint64(firstFunc.Entryoffset), md.Text, textsectmap32))
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
@@ -713,7 +730,7 @@ func getRtypeLayout(runtimeVersion string) *RtypeLayout {
 		layoutName = "1.7"
 	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19":
 		layoutName = "1.14"
-	case "1.20", "1.21", "1.22", "1.23", "1.24", "1.25":
+	case "1.20", "1.21", "1.22", "1.23", "1.24", "1.25", "1.26":
 		layoutName = "1.20"
 	default:
 		return nil
