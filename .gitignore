@@ -19,3 +19,6 @@ Dockerfile.test
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# Agent files
+.agent/
+.agents/
