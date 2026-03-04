@@ -349,7 +349,7 @@ scan:
 						break
 					}
 				}
-				
+
 				if ignored {
 					offset += moduledata_idx + len(pclntabVA_bytes)
 					continue

@@ -408,7 +408,7 @@ scan:
 						break
 					}
 				}
-				
+
 				if ignored {
 					offset += moduledata_idx_offset + len(pclntabVA_bytes)
 					continue
