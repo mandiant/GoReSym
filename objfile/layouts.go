@@ -338,11 +338,7 @@ type ModuleDataIntermediate struct {
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
 // This replaces the version-specific switch statements with a generic approach
 func parseModuleDataGeneric(rawData []byte, layoutVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
-	layout := moduleDataLayouts[layoutVersion]
-	if layout == nil {
-		layout = getModuleDataLayout(layoutVersion)
-	}
-
+	layout := getModuleDataLayout(layoutVersion)
 	md := &ModuleDataIntermediate{}
 
 	// Parse fields based on layout
@@ -415,7 +411,6 @@ func getFieldOffset(layout *ModuleDataLayout, fieldName FieldName, is64bit bool)
 func (e *Entry) validateAndConvertModuleData(
 	md *ModuleDataIntermediate,
 	moduleDataVA uint64,
-	version string,
 	is64bit bool,
 	littleendian bool,
 	ignorelist []uint64,
@@ -726,9 +721,9 @@ func getRtypeLayout(runtimeVersion string) *RtypeLayout {
 		layoutName = "1.6"
 	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13":
 		layoutName = "1.7"
-	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19":
+	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22":
 		layoutName = "1.14"
-	case "1.20", "1.21", "1.22", "1.23", "1.24", "1.25", "1.26":
+	case "1.23", "1.24", "1.25", "1.26":
 		layoutName = "1.20"
 	default:
 		return nil
