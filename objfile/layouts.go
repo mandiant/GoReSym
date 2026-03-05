@@ -132,7 +132,12 @@ type ModuleDataLayout struct {
 }
 
 // getModuleDataLayout returns the layout for a given Go version
-// Multiple versions may share the same layout
+// Multiple versions may share the same layout.
+// Note: Versions like "1.21" and "1.22" are "fake" layout versions.
+// Go stopped bumping the pclntab magic byte after 1.20, so 1.20-1.26 all share the same layoutVersion ("1.20").
+// However, the internal moduledata struct continued to change (e.g., offsets shifted in 1.22).
+// We use the runtimeVersion (extracted from buildinfo) to map to these fake layout versions
+// so we can correctly parse the shifted fields.
 func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
 	layoutName := runtimeVersion
@@ -161,6 +166,36 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 		return moduleDataLayouts["1.22"]
 	}
 	return layout
+}
+
+// IsValidLayoutForRuntime checks if the layoutVersion (derived from pclntab magic)
+// is compatible with the given runtimeVersion.
+// This is critical because pclntab_scan attempts to brute-force the magic byte to handle obfuscated binaries.
+// Without this validation, we could incorrectly accept a candidate with a newer magic byte (e.g., 1.20)
+// for an older binary (e.g., 1.17), which would cause subsequent function parsing to fail even if the
+// moduledata itself happens to parse successfully.
+func IsValidLayoutForRuntime(layoutVersion, runtimeVersion string) bool {
+	if runtimeVersion == "unknown" || layoutVersion == "unknown" {
+		return true
+	}
+
+	expectedLayout := runtimeVersion
+	switch runtimeVersion {
+	case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21":
+		expectedLayout = "1.20" // pclntab magic 1.20 is used for 1.20+
+	case "1.20":
+		expectedLayout = "1.20"
+	case "1.19", "1.18":
+		expectedLayout = "1.18"
+	case "1.17", "1.16":
+		expectedLayout = "1.16"
+	case "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8":
+		expectedLayout = "1.2" // gosym uses 1.2 for 1.2-1.15
+	case "1.7", "1.6", "1.5", "1.4", "1.3", "1.2":
+		expectedLayout = "1.2"
+	}
+
+	return layoutVersion == expectedLayout
 }
 
 // moduleDataLayouts defines field layouts for different Go versions
@@ -337,8 +372,12 @@ type ModuleDataIntermediate struct {
 
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
 // This replaces the version-specific switch statements with a generic approach
-func parseModuleDataGeneric(rawData []byte, layoutVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
-	layout := getModuleDataLayout(layoutVersion)
+func parseModuleDataGeneric(rawData []byte, runtimeVersion string, layoutVersion string, is64bit bool, littleendian bool) (*ModuleDataIntermediate, error) {
+	if !IsValidLayoutForRuntime(layoutVersion, runtimeVersion) {
+		return nil, fmt.Errorf("layoutVersion %s is incompatible with runtimeVersion %s", layoutVersion, runtimeVersion)
+	}
+
+	layout := getModuleDataLayout(runtimeVersion)
 	md := &ModuleDataIntermediate{}
 
 	// Parse fields based on layout
@@ -511,16 +550,19 @@ func (e *Entry) validateAndConvertModuleData_116(
 		var firstFunc FuncTab12_116_64
 		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 		if err != nil {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
 			return nil, ignorelist, err
 		}
 
 		err = firstFunc.parse(ftab_raw, littleendian)
 		if err != nil {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to parse ftab: %v\n", err)
 			return nil, ignorelist, err
 		}
 
 		// Validate: functab's first function should equal minpc value
 		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 minpc validation failed: %x != %x\n", uint64(firstFunc.Entryoffset), md.Minpc)
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
@@ -529,16 +571,19 @@ func (e *Entry) validateAndConvertModuleData_116(
 		var firstFunc FuncTab12_116_32
 		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
 		if err != nil {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
 			return nil, ignorelist, err
 		}
 
 		err = firstFunc.parse(ftab_raw, littleendian)
 		if err != nil {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to parse ftab: %v\n", err)
 			return nil, ignorelist, err
 		}
 
 		// Validate: functab's first function should equal minpc value
 		if uint64(firstFunc.Entryoffset) != md.Minpc {
+			fmt.Printf("DEBUG: validateAndConvertModuleData_116 minpc validation failed: %x != %x\n", uint64(firstFunc.Entryoffset), md.Minpc)
 			// Wrong moduledata, add to ignorelist
 			ignorelist = append(ignorelist, moduleDataVA)
 			return nil, ignorelist, fmt.Errorf("minpc validation failed")
@@ -721,9 +766,9 @@ func getRtypeLayout(runtimeVersion string) *RtypeLayout {
 		rTypeLayout = "1.6"
 	case "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13":
 		rTypeLayout = "1.7"
-	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22":
+	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19":
 		rTypeLayout = "1.14"
-	case "1.23", "1.24", "1.25", "1.26":
+	case "1.20", "1.21", "1.22", "1.23", "1.24", "1.25", "1.26":
 		rTypeLayout = "1.20"
 	default:
 		return nil

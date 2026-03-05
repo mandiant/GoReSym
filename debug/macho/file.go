@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/mandiant/GoReSym/debug/dwarf"
 )
@@ -33,6 +34,7 @@ type File struct {
 
 	closer                io.Closer
 	dataAfterSectionCache map[uint64][]byte // secVA -> dataAfterSection
+	dataAfterSectionMutex sync.Mutex
 }
 
 // A Load represents any Mach-O load command.
@@ -575,9 +577,12 @@ func (f *File) Segment(name string) *Segment {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
+	f.dataAfterSectionMutex.Lock()
 	if cached, ok := f.dataAfterSectionCache[target.Addr]; ok {
+		f.dataAfterSectionMutex.Unlock()
 		return cached
 	}
+	f.dataAfterSectionMutex.Unlock()
 
 	data := []byte{}
 	found := false
@@ -597,7 +602,10 @@ func (f *File) DataAfterSection(target *Section) []byte {
 			}
 		}
 	}
+
+	f.dataAfterSectionMutex.Lock()
 	f.dataAfterSectionCache[target.Addr] = data
+	f.dataAfterSectionMutex.Unlock()
 	return data
 }
 

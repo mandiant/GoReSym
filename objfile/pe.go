@@ -187,7 +187,7 @@ func (f *peFile) pcln_scan() (candidates <-chan PclntabCandidate, err error) {
 	send_patched_magic_candidates := func(candidate *PclntabCandidate) {
 		has_some_valid_magic := false
 		for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
-			if bytes.Equal(candidate.Pclntab, magic) {
+			if bytes.HasPrefix(candidate.Pclntab, magic) {
 				has_some_valid_magic = true
 				break
 			}
@@ -391,6 +391,7 @@ scan:
 			}
 		}
 
+
 		moduledata_idx = bytes.Index(data, pclntabVA_bytes)
 		if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
 			moduledata = data[moduledata_idx:]
@@ -403,23 +404,11 @@ scan:
 						continue scan
 					}
 				}
-<<<<<<< HEAD
-
-				if ignored {
-					offset += moduledata_idx_offset + len(pclntabVA_bytes)
-					continue
-				}
-
-				found = true
-				break scan
-			} else {
-				break
-=======
->>>>>>> 00606f1 (Revert unnecessary moduledata scanning changes in executable parsers)
 			}
 
 			found = true
 			break
+		} else {
 		}
 	}
 

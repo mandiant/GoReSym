@@ -269,6 +269,12 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 		runtimeVersion = parts[0] + "." + parts[1]
 	}
 
+	if runtimeVersion == "" || runtimeVersion == "unknown" {
+		runtimeVersion = layoutVersion
+	}
+
+	// Version validation is now handled inside parseModuleDataGeneric
+
 	var moduleDataCandidate *ModuleDataCandidate = nil
 
 	const maxattempts = 5
@@ -287,25 +293,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
 		switch runtimeVersion {
-		case "1.26":
-			fallthrough
-		case "1.25":
-			fallthrough
-		case "1.24":
-			fallthrough
-		case "1.23":
-			fallthrough
-		case "1.22":
-			fallthrough
-		case "1.21":
-			fallthrough
-		case "1.20":
-			fallthrough
-		case "1.19":
-			fallthrough
-		case "1.18":
+		case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -325,11 +315,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 
 			return secStart, result, nil
 
-		case "1.17":
-			fallthrough
-		case "1.16":
+		case "1.17", "1.16":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -349,31 +337,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 
 			return secStart, result, nil
 
-		case "1.5", "1.6":
-			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.5", is64bit, littleendian)
-			if err != nil {
-				continue
-			}
-
-			// Validate using legacy validation (no Types field, uses LegacyTypes)
-			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
-
 		case "1.7":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.7", is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -393,9 +359,32 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 
 			return secStart, result, nil
 
-		case "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15":
+		case "1.6", "1.5":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.8", is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+			if err != nil {
+				continue
+			}
+
+			// Validate using legacy validation (no Types field, uses LegacyTypes)
+			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
+				mdIntermediate,
+				moduleDataCandidate.ModuledataVA,
+				is64bit,
+				littleendian,
+				ignorelist,
+			)
+			if err != nil {
+				ignorelist = newIgnorelist
+				continue
+			}
+
+			return secStart, result, nil
+
+		default:
+			// Parse moduledata using generic layout-based parser
+			// Default to 1.8 layout for unknown or older versions (1.8 - 1.15)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}

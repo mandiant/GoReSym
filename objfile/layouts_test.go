@@ -201,7 +201,7 @@ func TestParseModuleDataGeneric_BackwardCompatibility(t *testing.T) {
 		rawData[303] = 0x00 // Types = 0x2000
 
 		// Parse with new generic approach
-		result, err := parseModuleDataGeneric(rawData, "1.21", true, true)
+		result, err := parseModuleDataGeneric(rawData, "1.21", "1.20", true, true)
 		if err != nil {
 			t.Fatalf("Generic parse failed: %v", err)
 		}

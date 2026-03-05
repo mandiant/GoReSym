@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/mandiant/GoReSym/debug/dwarf"
 	"github.com/mandiant/GoReSym/saferio"
@@ -61,6 +62,7 @@ type File struct {
 	gnuVersym []byte
 
 	dataAfterSectionCache map[uint64][]byte // secVA -> dataAfterSection
+	dataAfterSectionMutex sync.Mutex
 }
 
 // A SectionHeader represents a single ELF section header.
@@ -689,9 +691,12 @@ func getString(section []byte, start int) (string, bool) {
 }
 
 func (f *File) DataAfterSection(target *Section) []byte {
-	if cached, ok := f.dataAfterSectionCache[uint64(target.Addr)]; ok {
+	f.dataAfterSectionMutex.Lock()
+	if cached, ok := f.dataAfterSectionCache[target.Addr]; ok {
+		f.dataAfterSectionMutex.Unlock()
 		return cached
 	}
+	f.dataAfterSectionMutex.Unlock()
 
 	data := []byte{}
 	found := false
@@ -712,7 +717,9 @@ func (f *File) DataAfterSection(target *Section) []byte {
 		}
 	}
 
-	f.dataAfterSectionCache[uint64(target.Addr)] = data
+	f.dataAfterSectionMutex.Lock()
+	f.dataAfterSectionCache[target.Addr] = data
+	f.dataAfterSectionMutex.Unlock()
 	return data
 }
 

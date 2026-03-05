@@ -153,7 +153,7 @@ func (f *machoFile) pcln_scan() (candidates <-chan PclntabCandidate, err error) 
 	send_patched_magic_candidates := func(candidate *PclntabCandidate) {
 		has_some_valid_magic := false
 		for _, magic := range append(pclntab_sigs_le, pclntab_sigs_be...) {
-			if bytes.Equal(candidate.Pclntab, magic) {
+			if bytes.HasPrefix(candidate.Pclntab, magic) {
 				has_some_valid_magic = true
 				break
 			}
@@ -353,19 +353,6 @@ scan:
 				if ignore == moduledataVA {
 					continue scan
 				}
-<<<<<<< HEAD
-
-				if ignored {
-					offset += moduledata_idx + len(pclntabVA_bytes)
-					continue
-				}
-
-				found = true
-				break scan
-			} else {
-				break
-=======
->>>>>>> 00606f1 (Revert unnecessary moduledata scanning changes in executable parsers)
 			}
 
 			found = true
