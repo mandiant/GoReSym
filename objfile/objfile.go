@@ -292,7 +292,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
 		switch runtimeVersion {
-		case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
+		case "1.27", "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
 			// Parse moduledata using generic layout-based parser
 			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
@@ -406,7 +406,7 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 	}
 
 	// should only happen if all scan attempts and validation fail
-	return 0, nil, fmt.Errorf("moduledata not found")
+	return 0, nil, fmt.Errorf("moduledata not found, last error: %v", err)
 }
 
 func (e *Entry) readVarint(address uint64) (int, int, error) {
@@ -506,7 +506,10 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 
 		name := string(name_raw)
 		if typeFlags&tflagExtraStar != 0 {
-			return name[1:], nil
+			if len(name) > 0 {
+				return name[1:], nil
+			}
+			return name, nil
 		} else {
 			return name, nil
 		}
@@ -529,6 +532,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.25":
 		fallthrough
 	case "1.26":
+		fallthrough
+	case "1.27":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -541,7 +546,10 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 
 		name := string(name_raw)
 		if typeFlags&tflagExtraStar != 0 {
-			return name[1:], nil
+			if len(name) > 0 {
+				return name[1:], nil
+			}
+			return name, nil
 		} else {
 			return name, nil
 		}
@@ -995,6 +1003,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.25":
 			fallthrough
 		case "1.26":
+			fallthrough
+		case "1.27":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
@@ -1166,6 +1176,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.25":
 			fallthrough
 		case "1.26":
+			fallthrough
+		case "1.27":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer
@@ -1357,7 +1369,40 @@ func (e *Entry) ParseTypeLinks(runtimeVersion string, moduleData *ModuleData, is
 		return types, nil
 	}
 
-	// Modern layout, the typelinks is an array of offsets
+	// In Go 1.27+, Typelinks is removed and we iterate sequentially over types using Typedesclen
+	if moduleData.Typedesclen != 0 {
+		td := moduleData.Types + ptrSize
+		etypedesc := moduleData.Types + moduleData.Typedesclen
+		for td < etypedesc {
+			if td%ptrSize != 0 {
+				td += ptrSize - (td % ptrSize)
+			}
+
+			rawDat, err := e.raw.read_memory(td, 512)
+			if err != nil {
+				break
+			}
+			rt, _, err := parseRtypeGeneric(rawDat, runtimeVersion, is64bit, littleendian)
+			if err != nil {
+				td += ptrSize
+				continue
+			}
+
+			descSize := computeTypeDescriptorSize(rt, is64bit, rawDat, littleendian)
+			if descSize == 0 {
+				td += ptrSize
+				continue
+			}
+			parsed, err := e.ParseType(runtimeVersion, moduleData, td, is64bit, littleendian)
+			if err == nil {
+				types = append(types, parsed...)
+			}
+			td += descSize
+		}
+		return types, nil
+	}
+
+	// Modern layout (pre-1.27), the typelinks is an array of offsets
 	for i := 0; i < int(moduleData.Typelinks.Len); i++ {
 		// array of int32 offsets into moduleData.Types
 		offset, err := e.raw.read_memory(uint64(moduleData.Typelinks.Data)+uint64(i)*4, 4)
