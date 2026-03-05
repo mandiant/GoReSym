@@ -391,7 +391,6 @@ scan:
 			}
 		}
 
-
 		moduledata_idx = bytes.Index(data, pclntabVA_bytes)
 		if moduledata_idx != -1 && moduledata_idx < int(sec.Size) {
 			moduledata = data[moduledata_idx:]
