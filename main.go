@@ -233,6 +233,7 @@ restartParseWithRealTextBase:
 		// if that location works, then we must have given it the correct pclntab VA. At least in theory...
 		// The resolved offsets within the pclntab might have used the wrong base though! We'll fix that later.
 		_, tmpModData, err := file.ModuleDataTable(tab.PclntabVA, extractMetadata.Version, extractMetadata.TabMeta.Version, extractMetadata.TabMeta.PointerSize == 8, extractMetadata.TabMeta.Endianess == "LittleEndian")
+
 		if err == nil && tmpModData != nil {
 			// if the search candidate relied on a moduledata va, make sure it lines up with ours now
 			stomppedMagicMetaConstraintsValid := true

@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"github.com/elliotchance/orderedmap"
 	"github.com/mandiant/GoReSym/debug/dwarf"
@@ -261,13 +260,19 @@ func (e *Entry) PCLineTable(versionOverride string, knownPclntabVA uint64, known
 	return ch, nil
 }
 
-func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
+func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutVersion string, is64bit bool, littleendian bool) (secStart uint64, moduleData *ModuleData, err error) {
 	moduleData = &ModuleData{}
 	// Major version only, 1.15.5 -> 1.15
 	parts := strings.Split(runtimeVersion, ".")
 	if len(parts) >= 2 {
 		runtimeVersion = parts[0] + "." + parts[1]
 	}
+
+	if runtimeVersion == "" || runtimeVersion == "unknown" {
+		runtimeVersion = layoutVersion
+	}
+
+	// Version validation is now handled inside parseModuleDataGeneric
 
 	var moduleDataCandidate *ModuleDataCandidate = nil
 
@@ -286,25 +291,10 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 
 		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
 		// with some higher versions using the same layout as versions before it.
-		switch version {
-		// Refactored: Go 1.16-1.24 use generic parser with layout tables
-		case "1.25":
-			fallthrough
-		case "1.24":
-			fallthrough
-		case "1.23":
-			fallthrough
-		case "1.22":
-			fallthrough
-		case "1.21":
-			fallthrough
-		case "1.20":
-			fallthrough
-		case "1.19":
-			fallthrough
-		case "1.18":
+		switch runtimeVersion {
+		case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, version, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -313,7 +303,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			result, newIgnorelist, err := e.validateAndConvertModuleData(
 				mdIntermediate,
 				moduleDataCandidate.ModuledataVA,
-				version,
 				is64bit,
 				littleendian,
 				ignorelist,
@@ -325,11 +314,9 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 
 			return secStart, result, nil
 
-		case "1.17":
-			fallthrough
-		case "1.16":
+		case "1.17", "1.16":
 			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, version, is64bit, littleendian)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
 			if err != nil {
 				continue
 			}
@@ -338,7 +325,6 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 			result, newIgnorelist, err := e.validateAndConvertModuleData_116(
 				mdIntermediate,
 				moduleDataCandidate.ModuledataVA,
-				version,
 				is64bit,
 				littleendian,
 				ignorelist,
@@ -350,79 +336,72 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, version
 
 			return secStart, result, nil
 
-		case "1.2":
-			// Refactored: Go 1.5-1.15 use generic parser with layout tables
-			// this layout changes <= 1.5 even though the tab version stays constant
-			switch runtimeVersion {
-			case "1.5", "1.6":
-				// Parse moduledata using generic layout-based parser
-				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.5", is64bit, littleendian)
-				if err != nil {
-					continue
-				}
-
-				// Validate using legacy validation (no Types field, uses LegacyTypes)
-				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
-					mdIntermediate,
-					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
-					is64bit,
-					littleendian,
-					ignorelist,
-				)
-				if err != nil {
-					ignorelist = newIgnorelist
-					continue
-				}
-
-				return secStart, result, nil
-
-			case "1.7":
-				// Parse moduledata using generic layout-based parser
-				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.7", is64bit, littleendian)
-				if err != nil {
-					continue
-				}
-
-				// Validate using legacy validation (has Types/Etypes/Itablinks)
-				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
-					mdIntermediate,
-					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
-					is64bit,
-					littleendian,
-					ignorelist,
-				)
-				if err != nil {
-					ignorelist = newIgnorelist
-					continue
-				}
-
-				return secStart, result, nil
-
-			case "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15":
-				// Parse moduledata using generic layout-based parser
-				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, "1.8", is64bit, littleendian)
-				if err != nil {
-					continue
-				}
-
-				// Validate using legacy validation (has Types/Etypes/Itablinks/Textsectmap)
-				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
-					mdIntermediate,
-					moduleDataCandidate.ModuledataVA,
-					runtimeVersion,
-					is64bit,
-					littleendian,
-					ignorelist,
-				)
-				if err != nil {
-					ignorelist = newIgnorelist
-					continue
-				}
-
-				return secStart, result, nil
+		case "1.7":
+			// Parse moduledata using generic layout-based parser
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+			if err != nil {
+				continue
 			}
+
+			// Validate using legacy validation (has Types/Etypes/Itablinks)
+			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+				mdIntermediate,
+				moduleDataCandidate.ModuledataVA,
+				is64bit,
+				littleendian,
+				ignorelist,
+			)
+			if err != nil {
+				ignorelist = newIgnorelist
+				continue
+			}
+
+			return secStart, result, nil
+
+		case "1.6", "1.5":
+			// Parse moduledata using generic layout-based parser
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+			if err != nil {
+				continue
+			}
+
+			// Validate using legacy validation (no Types field, uses LegacyTypes)
+			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
+				mdIntermediate,
+				moduleDataCandidate.ModuledataVA,
+				is64bit,
+				littleendian,
+				ignorelist,
+			)
+			if err != nil {
+				ignorelist = newIgnorelist
+				continue
+			}
+
+			return secStart, result, nil
+
+		default:
+			// Parse moduledata using generic layout-based parser
+			// Default to 1.8 layout for unknown or older versions (1.8 - 1.15)
+			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+			if err != nil {
+				continue
+			}
+
+			// Validate using legacy validation (has Types/Etypes/Itablinks/Textsectmap)
+			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+				mdIntermediate,
+				moduleDataCandidate.ModuledataVA,
+				is64bit,
+				littleendian,
+				ignorelist,
+			)
+			if err != nil {
+				ignorelist = newIgnorelist
+				continue
+			}
+
+			return secStart, result, nil
 		}
 	}
 
@@ -548,6 +527,8 @@ func (e *Entry) readRTypeName(runtimeVersion string, typeFlags tflag, namePtr ui
 	case "1.24":
 		fallthrough
 	case "1.25":
+		fallthrough
+	case "1.26":
 		varint_len, namelen, err := e.readVarint(namePtr + 1)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read name")
@@ -920,23 +901,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize)
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				methods.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			} else {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				methods.Data = pvoid64(tmp.Data)
-				methods.Len = uint64(tmp.Len)
-				methods.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			}
 
 			interfaceDef := fmt.Sprintf("type %s interface {", _type.Str)
@@ -1012,26 +993,28 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.24":
 			fallthrough
 		case "1.25":
+			fallthrough
+		case "1.26":
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				methods.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			} else {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				methods.Data = pvoid64(tmp.Data)
-				methods.Len = uint64(tmp.Len)
-				methods.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			}
 
 			interfaceDef := "type interface {"
@@ -1045,23 +1028,21 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			// 	name nameOff // name of method
 			// 	typ  typeOff // .(*FuncType) underneath
 			// }
-			entrySize := uint64(unsafe.Sizeof(IMethod{}))
+			// size = 8 bytes (two int32s)
+			entrySize := uint64(8)
 			for i := 0; i < int(methods.Len); i++ {
 				imethoddata, err := e.raw.read_memory(uint64(methods.Data)+entrySize*uint64(i), entrySize)
 				if err != nil {
 					continue
 				}
 
-				var method IMethod
-				err = method.parse(imethoddata, littleendian)
-				if err != nil {
-					continue
-				}
+				methodNameOff := readInt32(imethoddata, 0, littleendian)
+				methodTypOff := readInt32(imethoddata, 4, littleendian)
 
-				typeAddr := moduleData.Types + uint64(method.Typ)
+				typeAddr := moduleData.Types + uint64(methodTypOff)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 
-				name_ptr := moduleData.Types + uint64(method.Name)
+				name_ptr := moduleData.Types + uint64(methodNameOff)
 				name, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
 				if err != nil {
 					continue
@@ -1092,23 +1073,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var fieldsStartAddr uint64 = typeAddress + uint64(_type.baseSize)
 			var fields GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				fields.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			} else {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				fields.Data = pvoid64(tmp.Data)
-				fields.Len = uint64(tmp.Len)
-				fields.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			}
 
 			structDef := fmt.Sprintf("type %s struct {", _type.Str)
@@ -1183,6 +1164,8 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 		case "1.24":
 			fallthrough
 		case "1.25":
+			fallthrough
+		case "1.26":
 			// type structType struct {
 			// 	rtype
 			// 	pkgPath name // pointer
@@ -1191,23 +1174,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var fieldsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var fields GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				fields.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			} else {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				fields.Data = pvoid64(tmp.Data)
-				fields.Len = uint64(tmp.Len)
-				fields.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			}
 
 			structDef := "type struct {"
