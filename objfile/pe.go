@@ -403,19 +403,6 @@ scan:
 						continue scan
 					}
 				}
-<<<<<<< HEAD
-
-				if ignored {
-					offset += moduledata_idx_offset + len(pclntabVA_bytes)
-					continue
-				}
-
-				found = true
-				break scan
-			} else {
-				break
-=======
->>>>>>> 00606f1 (Revert unnecessary moduledata scanning changes in executable parsers)
 			}
 
 			found = true

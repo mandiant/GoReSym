@@ -343,19 +343,6 @@ scan:
 				if ignore == secStart+uint64(moduledata_idx) {
 					continue scan
 				}
-<<<<<<< HEAD
-
-				if ignored {
-					offset += moduledata_idx + len(pclntabVA_bytes)
-					continue
-				}
-
-				found = true
-				break scan
-			} else {
-				break
-=======
->>>>>>> 00606f1 (Revert unnecessary moduledata scanning changes in executable parsers)
 			}
 
 			found = true
