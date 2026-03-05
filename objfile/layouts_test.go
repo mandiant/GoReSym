@@ -243,6 +243,7 @@ func TestVersionMapping(t *testing.T) {
 		{"1.22", "1.21"}, // 1.22 uses same layout as 1.21
 		{"1.23", "1.21"}, // 1.23 uses same layout as 1.21
 		{"1.24", "1.21"}, // 1.24 uses same layout as 1.21
+		{"1.27", "1.27"}, // 1.27 has its own layout (Typedesclen replaces Typelinks)
 		{"1.26", "1.22"}, // 1.26 uses 1.22 layout
 		{"1.25", "1.21"}, // 1.25 uses same layout as 1.21
 		{"1.20", "1.20"},
@@ -728,11 +729,14 @@ func TestRtypeVersionMapping(t *testing.T) {
 		{"1.17", "1.14"},
 		{"1.18", "1.14"},
 		{"1.19", "1.14"},
-		{"1.20", "1.20"},
-		{"1.21", "1.20"},
-		{"1.22", "1.20"},
+		{"1.20", "1.14"},
+		{"1.21", "1.14"},
+		{"1.22", "1.14"},
 		{"1.23", "1.20"},
 		{"1.24", "1.20"},
+		{"1.25", "1.20"},
+		{"1.26", "1.20"},
+		{"1.27", "1.20"},
 	}
 
 	for _, tc := range testCases {

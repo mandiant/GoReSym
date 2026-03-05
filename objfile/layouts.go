@@ -2,6 +2,7 @@
 package objfile
 
 import (
+	"encoding/binary"
 	"fmt"
 	"unsafe"
 )
@@ -19,8 +20,9 @@ const (
 	FieldTextsectmap                  // 5
 	FieldTypelinks                    // 6
 	FieldItablinks                    // 7
-	FieldPkgPath                      // 8 (for Interface)
-	FieldMethods                      // 9 (for Interface)
+	FieldTypedesclen                  // 8
+	FieldPkgPath                      // 9 (for Interface)
+	FieldMethods                      // 10 (for Interface)
 	// Rtype fields (Go reflection types)
 	FieldSize       // 10
 	FieldPtrdata    // 11
@@ -52,6 +54,8 @@ func (f FieldName) String() string {
 		return "Typelinks"
 	case FieldItablinks:
 		return "Itablinks"
+	case FieldTypedesclen:
+		return "Typedesclen"
 	case FieldPkgPath:
 		return "PkgPath"
 	case FieldMethods:
@@ -166,6 +170,19 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 // moduleDataLayouts defines field layouts for different Go versions
 // Only fields that GoReSym actually uses are included
 var moduleDataLayouts = map[string]*ModuleDataLayout{
+	"1.27": {
+		Version: "1.27",
+		Fields: []FieldInfo{
+			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
+			{Name: FieldMinpc, Offset64: 160, Offset32: 80, Type: FieldTypePvoid},
+			{Name: FieldText, Offset64: 176, Offset32: 88, Type: FieldTypePvoid},
+			{Name: FieldTypes, Offset64: 296, Offset32: 148, Type: FieldTypePvoid},
+			{Name: FieldTypedesclen, Offset64: 304, Offset32: 152, Type: FieldTypePvoid},
+			{Name: FieldEtypes, Offset64: 312, Offset32: 156, Type: FieldTypePvoid},
+			{Name: FieldTextsectmap, Offset64: 344, Offset32: 172, Type: FieldTypeSlice},
+			{Name: FieldItablinks, Offset64: 368, Offset32: 184, Type: FieldTypeSlice},
+		},
+	},
 	"1.22": {
 		Version: "1.22",
 		Fields: []FieldInfo{
@@ -329,6 +346,7 @@ type ModuleDataIntermediate struct {
 	Minpc       uint64
 	Text        uint64
 	Types       uint64
+	Typedesclen uint64
 	Etypes      uint64
 	Textsectmap GoSlice64
 	Typelinks   GoSlice64
@@ -374,6 +392,8 @@ func parseModuleDataGeneric(rawData []byte, layoutVersion string, is64bit bool, 
 			md.Text = readPointer(rawData, offset, is64bit, littleendian)
 		case FieldTypes:
 			md.Types = readPointer(rawData, offset, is64bit, littleendian)
+		case FieldTypedesclen:
+			md.Typedesclen = readPointer(rawData, offset, is64bit, littleendian)
 		case FieldEtypes:
 			md.Etypes = readPointer(rawData, offset, is64bit, littleendian)
 		case FieldTextsectmap:
@@ -485,12 +505,13 @@ func (e *Entry) validateAndConvertModuleData(
 
 	// Validation passed, create final ModuleData struct
 	result := &ModuleData{
-		VA:        moduleDataVA,
-		TextVA:    md.Text,
-		Types:     md.Types,
-		ETypes:    md.Etypes,
-		Typelinks: md.Typelinks,
-		ITablinks: md.Itablinks,
+		VA:          moduleDataVA,
+		TextVA:      md.Text,
+		Types:       md.Types,
+		Typedesclen: md.Typedesclen,
+		ETypes:      md.Etypes,
+		Typelinks:   md.Typelinks,
+		ITablinks:   md.Itablinks,
 	}
 
 	return result, ignorelist, nil
@@ -723,7 +744,7 @@ func getRtypeLayout(runtimeVersion string) *RtypeLayout {
 		rTypeLayout = "1.7"
 	case "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22":
 		rTypeLayout = "1.14"
-	case "1.23", "1.24", "1.25", "1.26":
+	case "1.23", "1.24", "1.25", "1.26", "1.27":
 		rTypeLayout = "1.20"
 	default:
 		return nil
@@ -947,4 +968,164 @@ func getInterfaceLayout(version string) *InterfaceLayout {
 			MethodsFormat:     IFMethodsPost17,
 		}
 	}
+}
+
+// computeTypeDescriptorSize computes the memory size of a type descriptor.
+// Matches Go's internal/abi/type.go DescriptorSize() function.
+//
+// Actual sizeof for each type on 64-bit (based on Go 1.27 internal/abi source):
+//
+//	Type=48, ArrayType=72, ChanType=64, FuncType=56
+//	InterfaceType=80, MapType=112, PtrType=56, SliceType=56
+//	StructType=80, StructField=24, UncommonType=16, Method=16, Imethod=8
+//
+// Actual sizeof for each type on 32-bit:
+//
+//	Type=32, ArrayType=44, ChanType=40, FuncType=36
+//	InterfaceType=48, MapType=60, PtrType=36, SliceType=36
+//	StructType=48, StructField=12, UncommonType=16, Method=16, Imethod=8
+func computeTypeDescriptorSize(rt *RtypeIntermediate, is64bit bool, rawData []byte, littleEndian bool) uint64 {
+	// sizeof for each type struct in Go 1.27 internal/abi
+	var typeSize uint64
+	var arrayTypeSize uint64
+	var chanTypeSize uint64
+	var funcTypeSize uint64
+	var ifaceTypeSize uint64
+	var mapTypeSize uint64
+	var ptrTypeSize uint64
+	var sliceTypeSize uint64
+	var structTypeSize uint64
+	var structFieldSize uint64
+	var ptrSize uint64
+
+	if is64bit {
+		typeSize = 48
+		arrayTypeSize = 72
+		chanTypeSize = 64
+		funcTypeSize = 56
+		ifaceTypeSize = 80
+		mapTypeSize = 112
+		ptrTypeSize = 56
+		sliceTypeSize = 56
+		structTypeSize = 80
+		structFieldSize = 24
+		ptrSize = 8
+	} else {
+		typeSize = 32
+		arrayTypeSize = 44
+		chanTypeSize = 40
+		funcTypeSize = 36
+		ifaceTypeSize = 48
+		mapTypeSize = 60
+		ptrTypeSize = 36
+		sliceTypeSize = 36
+		structTypeSize = 48
+		structFieldSize = 12
+		ptrSize = 4
+	}
+
+	var baseSize uint64 = 0
+	var addSize uint64 = 0
+
+	kind := rt.Kind & 0x1f
+	switch kind {
+	case 17: // Array
+		baseSize = arrayTypeSize
+	case 18: // Chan
+		baseSize = chanTypeSize
+	case 19: // Func
+		baseSize = funcTypeSize
+		// addSize = (inCount + outCount) * ptrSize
+		if len(rawData) >= int(baseSize) {
+			var inCount, outCount uint16
+			if littleEndian {
+				inCount = binary.LittleEndian.Uint16(rawData[typeSize:])
+				outCount = binary.LittleEndian.Uint16(rawData[typeSize+2:])
+			} else {
+				inCount = binary.BigEndian.Uint16(rawData[typeSize:])
+				outCount = binary.BigEndian.Uint16(rawData[typeSize+2:])
+			}
+			outCount = outCount & 0x7FFF
+			addSize = uint64(inCount+outCount) * ptrSize
+		}
+	case 20: // Interface
+		baseSize = ifaceTypeSize
+		// addSize = len(Methods) * sizeof(Imethod=8)
+		// Methods slice offset in InterfaceType: typeSize + sizeof(Name=ptrSize)
+		methodsSliceOff := typeSize + ptrSize
+		if len(rawData) >= int(baseSize) {
+			var methodsLen uint64
+			if is64bit {
+				// slice header: Data(8), Len(8), Cap(8)
+				if littleEndian {
+					methodsLen = binary.LittleEndian.Uint64(rawData[methodsSliceOff+8:])
+				} else {
+					methodsLen = binary.BigEndian.Uint64(rawData[methodsSliceOff+8:])
+				}
+			} else {
+				if littleEndian {
+					methodsLen = uint64(binary.LittleEndian.Uint32(rawData[methodsSliceOff+4:]))
+				} else {
+					methodsLen = uint64(binary.BigEndian.Uint32(rawData[methodsSliceOff+4:]))
+				}
+			}
+			addSize = methodsLen * 8 // sizeof(Imethod)
+		}
+	case 21: // Map
+		baseSize = mapTypeSize
+	case 22: // Pointer
+		baseSize = ptrTypeSize
+	case 23: // Slice
+		baseSize = sliceTypeSize
+	case 25: // Struct
+		baseSize = structTypeSize
+		// addSize = len(Fields) * sizeof(StructField)
+		// Fields slice offset in StructType: typeSize + sizeof(Name=ptrSize)
+		fieldsSliceOff := typeSize + ptrSize
+		if len(rawData) >= int(baseSize) {
+			var fieldsLen uint64
+			if is64bit {
+				if littleEndian {
+					fieldsLen = binary.LittleEndian.Uint64(rawData[fieldsSliceOff+8:])
+				} else {
+					fieldsLen = binary.BigEndian.Uint64(rawData[fieldsSliceOff+8:])
+				}
+			} else {
+				if littleEndian {
+					fieldsLen = uint64(binary.LittleEndian.Uint32(rawData[fieldsSliceOff+4:]))
+				} else {
+					fieldsLen = uint64(binary.BigEndian.Uint32(rawData[fieldsSliceOff+4:]))
+				}
+			}
+			addSize = fieldsLen * structFieldSize
+		}
+	default:
+		// Bool, Int*, Uint*, Float*, Complex*, String, UnsafePointer
+		baseSize = typeSize
+	}
+
+	ret := baseSize
+
+	// uncommonType follows immediately after the concrete type struct
+	var mcount uint16 = 0
+	if uint8(rt.Tflag)&uint8(tflagUncommon) != 0 {
+		uncommonSize := uint64(16) // sizeof(UncommonType) = 16
+		ret += uncommonSize
+
+		if len(rawData) >= int(baseSize+uncommonSize) {
+			up := rawData[baseSize : baseSize+uncommonSize]
+			if littleEndian {
+				mcount = binary.LittleEndian.Uint16(up[4:6])
+			} else {
+				mcount = binary.BigEndian.Uint16(up[4:6])
+			}
+		}
+	}
+
+	ret += addSize
+
+	// Method = NameOff(4) + Mtyp(4) + Ifn(4) + Tfn(4) = 16 bytes
+	ret += uint64(mcount) * 16
+
+	return ret
 }
