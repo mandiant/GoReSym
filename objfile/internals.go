@@ -13,15 +13,11 @@ type GoSlice64 struct {
 	Capacity uint64
 }
 
-
-
 type Textsect struct {
 	Vaddr    uint64 // prelinked section vaddr
 	End      uint64 // vaddr + section length
 	Baseaddr uint64 // relocated section address
 }
-
-
 
 type Kind uint8 // mask & 0x1f
 
@@ -135,8 +131,6 @@ type tflag uint8
 type nameOff int32
 type typeOff int32
 
-
-
 // This is a general structure that just holds the fields I care about
 // this lets us return a single type, even though rtypes change between go version
 type Type struct {
@@ -210,4 +204,3 @@ func textAddr(off uint64, text uint64, textsectmap []Textsect) uint64 {
 	}
 	return res
 }
-

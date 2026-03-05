@@ -223,9 +223,6 @@ func TestModuleDataIntermediate_FieldTypes(t *testing.T) {
 	}
 }
 
-
-
-
 // Test version mapping for legacy versions
 func TestVersionMapping_Legacy(t *testing.T) {
 	testCases := []struct {
@@ -258,8 +255,6 @@ func TestVersionMapping_Legacy(t *testing.T) {
 		})
 	}
 }
-
-
 
 // Test Rtype version mapping
 func TestRtypeVersionMapping(t *testing.T) {

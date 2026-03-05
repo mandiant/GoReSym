@@ -31,9 +31,9 @@ const (
 	FieldStr        // 17
 	FieldTflag      // 18
 	// Textsect fields
-	FieldVaddr      // 19
-	FieldEnd        // 20
-	FieldBaseaddr   // 21
+	FieldVaddr    // 19
+	FieldEnd      // 20
+	FieldBaseaddr // 21
 	// FuncTab fields
 	FieldEntryoffset // 22
 	FieldFuncoffset  // 23
@@ -508,8 +508,6 @@ func parseModuleDataGeneric(rawData []byte, runtimeVersion string, layoutVersion
 	return md, nil
 }
 
-
-
 // validateAndConvertModuleData performs validation and converts intermediate moduledata
 // to the final ModuleData struct used by GoReSym
 // This replaces the duplicated validation logic in version-specific switch cases
@@ -543,7 +541,7 @@ func (e *Entry) validateAndConvertModuleData(
 
 	// Read textsectmap entries
 	var textsectmap []Textsect
-	
+
 	sectSize := textsectLayout.BaseSize64
 	if !is64bit {
 		sectSize = textsectLayout.BaseSize32
@@ -604,7 +602,7 @@ func (e *Entry) validateAndConvertModuleData_116(
 	if !is64bit {
 		ftabSize = functabLayoutLegacy.BaseSize32
 	}
-	
+
 	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
 	if err != nil {
 		fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
@@ -655,7 +653,7 @@ func (e *Entry) validateAndConvertModuleData_Legacy(
 	if !is64bit {
 		ftabSize = functabLayoutLegacy.BaseSize32
 	}
-	
+
 	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
 	if err != nil {
 		return nil, ignorelist, err
@@ -704,7 +702,7 @@ func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
 	if !is64bit {
 		ftabSize = functabLayoutLegacy.BaseSize32
 	}
-	
+
 	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
 	if err != nil {
 		return nil, ignorelist, err
