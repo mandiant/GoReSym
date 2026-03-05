@@ -3,7 +3,6 @@ package objfile
 
 import (
 	"fmt"
-	"unsafe"
 )
 
 // FieldName represents the name of a field in binary structures
@@ -31,6 +30,13 @@ const (
 	FieldKind       // 16
 	FieldStr        // 17
 	FieldTflag      // 18
+	// Textsect fields
+	FieldVaddr      // 19
+	FieldEnd        // 20
+	FieldBaseaddr   // 21
+	// FuncTab fields
+	FieldEntryoffset // 22
+	FieldFuncoffset  // 23
 )
 
 // String representation for debugging/logging
@@ -74,6 +80,16 @@ func (f FieldName) String() string {
 		return "Str"
 	case FieldTflag:
 		return "Tflag"
+	case FieldVaddr:
+		return "Vaddr"
+	case FieldEnd:
+		return "End"
+	case FieldBaseaddr:
+		return "Baseaddr"
+	case FieldEntryoffset:
+		return "Entryoffset"
+	case FieldFuncoffset:
+		return "Funcoffset"
 	default:
 		return "Unknown"
 	}
@@ -85,12 +101,9 @@ type FieldType uint8
 const (
 	FieldTypePvoid  FieldType = iota // 0 - pointer/address (void *)
 	FieldTypeSlice                   // 1 - Go slice (ptr, len, cap)
-	FieldTypeString                  // 2 - Go string (ptr, len)
-	FieldTypeInt                     // 3 - integer value
-	FieldTypeName                    // 4 - name offset (Go 1.18+)
-	FieldTypeUint32                  // 5 - unsigned 32-bit integer
-	FieldTypeUint8                   // 6 - unsigned 8-bit integer
-	FieldTypeInt32                   // 7 - signed 32-bit integer
+	FieldTypeUint32                  // 2 - unsigned 32-bit integer
+	FieldTypeUint8                   // 3 - unsigned 8-bit integer
+	FieldTypeInt32                   // 4 - signed 32-bit integer
 )
 
 // String representation for debugging
@@ -100,12 +113,6 @@ func (f FieldType) String() string {
 		return "pvoid"
 	case FieldTypeSlice:
 		return "slice"
-	case FieldTypeString:
-		return "string"
-	case FieldTypeInt:
-		return "int"
-	case FieldTypeName:
-		return "name"
 	case FieldTypeUint32:
 		return "uint32"
 	case FieldTypeUint8:
@@ -129,6 +136,49 @@ type FieldInfo struct {
 type ModuleDataLayout struct {
 	Version string
 	Fields  []FieldInfo
+}
+
+// StructLayout describes the binary layout of a generic structure
+type StructLayout struct {
+	Fields     []FieldInfo
+	BaseSize64 int
+	BaseSize32 int
+}
+
+// MemoryReader provides utility methods for reading fields from a byte slice based on a StructLayout
+type MemoryReader struct {
+	Data         []byte
+	Layout       *StructLayout
+	Is64Bit      bool
+	LittleEndian bool
+}
+
+func (m *MemoryReader) ReadPointer(field FieldName) uint64 {
+	offset, found := getFieldOffsetFromList(m.Layout.Fields, field, m.Is64Bit)
+	if !found {
+		return 0
+	}
+	return readPointer(m.Data, offset, m.Is64Bit, m.LittleEndian)
+}
+
+func (m *MemoryReader) ReadUint32(field FieldName) uint32 {
+	offset, found := getFieldOffsetFromList(m.Layout.Fields, field, m.Is64Bit)
+	if !found {
+		return 0
+	}
+	return readUint32(m.Data, offset, m.LittleEndian)
+}
+
+func getFieldOffsetFromList(fields []FieldInfo, fieldName FieldName, is64bit bool) (int, bool) {
+	for _, field := range fields {
+		if field.Name == fieldName {
+			if is64bit {
+				return field.Offset64, true
+			}
+			return field.Offset32, true
+		}
+	}
+	return 0, false
 }
 
 // getModuleDataLayout returns the layout for a given Go version
@@ -196,6 +246,34 @@ func IsValidLayoutForRuntime(layoutVersion, runtimeVersion string) bool {
 	}
 
 	return layoutVersion == expectedLayout
+}
+
+var textsectLayout = &StructLayout{
+	Fields: []FieldInfo{
+		{Name: FieldVaddr, Offset64: 0, Offset32: 0, Type: FieldTypePvoid},
+		{Name: FieldEnd, Offset64: 8, Offset32: 4, Type: FieldTypePvoid},
+		{Name: FieldBaseaddr, Offset64: 16, Offset32: 8, Type: FieldTypePvoid},
+	},
+	BaseSize64: 24,
+	BaseSize32: 12,
+}
+
+var functabLayout118 = &StructLayout{
+	Fields: []FieldInfo{
+		{Name: FieldEntryoffset, Offset64: 0, Offset32: 0, Type: FieldTypeUint32},
+		{Name: FieldFuncoffset, Offset64: 4, Offset32: 4, Type: FieldTypeUint32},
+	},
+	BaseSize64: 8,
+	BaseSize32: 8,
+}
+
+var functabLayoutLegacy = &StructLayout{
+	Fields: []FieldInfo{
+		{Name: FieldEntryoffset, Offset64: 0, Offset32: 0, Type: FieldTypePvoid},
+		{Name: FieldFuncoffset, Offset64: 8, Offset32: 4, Type: FieldTypePvoid},
+	},
+	BaseSize64: 16,
+	BaseSize32: 8,
 }
 
 // moduleDataLayouts defines field layouts for different Go versions
@@ -430,18 +508,7 @@ func parseModuleDataGeneric(rawData []byte, runtimeVersion string, layoutVersion
 	return md, nil
 }
 
-// getFieldOffset returns the offset for a named field in a layout
-func getFieldOffset(layout *ModuleDataLayout, fieldName FieldName, is64bit bool) (int, bool) {
-	for _, field := range layout.Fields {
-		if field.Name == fieldName {
-			if is64bit {
-				return field.Offset64, true
-			}
-			return field.Offset32, true
-		}
-	}
-	return 0, false
-}
+
 
 // validateAndConvertModuleData performs validation and converts intermediate moduledata
 // to the final ModuleData struct used by GoReSym
@@ -456,16 +523,18 @@ func (e *Entry) validateAndConvertModuleData(
 ) (*ModuleData, []uint64, error) {
 
 	// Read and validate first function from ftab
-	var firstFunc FuncTab118
-	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
+	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(functabLayout118.BaseSize64))
 	if err != nil {
 		return nil, ignorelist, err
 	}
 
-	err = firstFunc.parse(ftab_raw, littleendian)
-	if err != nil {
-		return nil, ignorelist, err
+	ftabReader := MemoryReader{
+		Data:         ftab_raw,
+		Layout:       functabLayout118,
+		Is64Bit:      is64bit,
+		LittleEndian: littleendian,
 	}
+	entryOffset := ftabReader.ReadUint32(FieldEntryoffset)
 
 	// Prevent loop on invalid modules with bogus length
 	if md.Textsectmap.Len > 0x100 {
@@ -473,53 +542,38 @@ func (e *Entry) validateAndConvertModuleData(
 	}
 
 	// Read textsectmap entries
-	var textsectmap64 []Textsect_64
-	var textsectmap32 []Textsect_32
+	var textsectmap []Textsect
+	
+	sectSize := textsectLayout.BaseSize64
+	if !is64bit {
+		sectSize = textsectLayout.BaseSize32
+	}
 
-	if is64bit {
-		for i := 0; i < int(md.Textsectmap.Len); i++ {
-			var textsect Textsect_64
-			var sectSize = uint64(unsafe.Sizeof(textsect))
-			textsec_raw, err := e.raw.read_memory(uint64(md.Textsectmap.Data)+uint64(i)*sectSize, sectSize)
-			if err != nil {
-				return nil, ignorelist, err
-			}
-
-			err = textsect.parse(textsec_raw, littleendian)
-			if err != nil {
-				return nil, ignorelist, err
-			}
-			textsectmap64 = append(textsectmap64, textsect)
+	for i := 0; i < int(md.Textsectmap.Len); i++ {
+		textsec_raw, err := e.raw.read_memory(uint64(md.Textsectmap.Data)+(uint64(i)*uint64(sectSize)), uint64(sectSize))
+		if err != nil {
+			return nil, ignorelist, err
 		}
 
-		// Validate: functab's first function should equal minpc value
-		if textAddr64(uint64(firstFunc.Entryoffset), md.Text, textsectmap64) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
-	} else {
-		for i := 0; i < int(md.Textsectmap.Len); i++ {
-			var textsect Textsect_32
-			var sectSize = uint64(unsafe.Sizeof(textsect))
-			textsec_raw, err := e.raw.read_memory(uint64(md.Textsectmap.Data)+uint64(i)*sectSize, sectSize)
-			if err != nil {
-				return nil, ignorelist, err
-			}
-
-			err = textsect.parse(textsec_raw, littleendian)
-			if err != nil {
-				return nil, ignorelist, err
-			}
-			textsectmap32 = append(textsectmap32, textsect)
+		sectReader := MemoryReader{
+			Data:         textsec_raw,
+			Layout:       textsectLayout,
+			Is64Bit:      is64bit,
+			LittleEndian: littleendian,
 		}
 
-		// Validate: functab's first function should equal minpc value
-		if textAddr32(uint64(firstFunc.Entryoffset), md.Text, textsectmap32) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
+		textsectmap = append(textsectmap, Textsect{
+			Vaddr:    sectReader.ReadPointer(FieldVaddr),
+			End:      sectReader.ReadPointer(FieldEnd),
+			Baseaddr: sectReader.ReadPointer(FieldBaseaddr),
+		})
+	}
+
+	// Validate: functab's first function should equal minpc value
+	if textAddr(uint64(entryOffset), md.Text, textsectmap) != md.Minpc {
+		// Wrong moduledata, add to ignorelist
+		ignorelist = append(ignorelist, moduleDataVA)
+		return nil, ignorelist, fmt.Errorf("minpc validation failed")
 	}
 
 	// Validation passed, create final ModuleData struct
@@ -546,48 +600,31 @@ func (e *Entry) validateAndConvertModuleData_116(
 ) (*ModuleData, []uint64, error) {
 
 	// Read and validate first function from ftab
-	if is64bit {
-		var firstFunc FuncTab12_116_64
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
-			return nil, ignorelist, err
-		}
+	ftabSize := functabLayoutLegacy.BaseSize64
+	if !is64bit {
+		ftabSize = functabLayoutLegacy.BaseSize32
+	}
+	
+	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
+	if err != nil {
+		fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
+		return nil, ignorelist, err
+	}
 
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to parse ftab: %v\n", err)
-			return nil, ignorelist, err
-		}
+	ftabReader := MemoryReader{
+		Data:         ftab_raw,
+		Layout:       functabLayoutLegacy,
+		Is64Bit:      is64bit,
+		LittleEndian: littleendian,
+	}
+	entryOffset := ftabReader.ReadPointer(FieldEntryoffset)
 
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 minpc validation failed: %x != %x\n", uint64(firstFunc.Entryoffset), md.Minpc)
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
-	} else {
-		var firstFunc FuncTab12_116_32
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to read ftab: %v\n", err)
-			return nil, ignorelist, err
-		}
-
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 failed to parse ftab: %v\n", err)
-			return nil, ignorelist, err
-		}
-
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			fmt.Printf("DEBUG: validateAndConvertModuleData_116 minpc validation failed: %x != %x\n", uint64(firstFunc.Entryoffset), md.Minpc)
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
+	// Validate: functab's first function should equal minpc value
+	if entryOffset != md.Minpc {
+		fmt.Printf("DEBUG: validateAndConvertModuleData_116 minpc validation failed: %x != %x\n", entryOffset, md.Minpc)
+		// Wrong moduledata, add to ignorelist
+		ignorelist = append(ignorelist, moduleDataVA)
+		return nil, ignorelist, fmt.Errorf("minpc validation failed")
 	}
 
 	// Validation passed, create final ModuleData struct
@@ -614,42 +651,29 @@ func (e *Entry) validateAndConvertModuleData_Legacy(
 ) (*ModuleData, []uint64, error) {
 
 	// Read and validate first function from ftab
-	if is64bit {
-		var firstFunc FuncTab12_116_64
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			return nil, ignorelist, err
-		}
+	ftabSize := functabLayoutLegacy.BaseSize64
+	if !is64bit {
+		ftabSize = functabLayoutLegacy.BaseSize32
+	}
+	
+	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
+	if err != nil {
+		return nil, ignorelist, err
+	}
 
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			return nil, ignorelist, err
-		}
+	ftabReader := MemoryReader{
+		Data:         ftab_raw,
+		Layout:       functabLayoutLegacy,
+		Is64Bit:      is64bit,
+		LittleEndian: littleendian,
+	}
+	entryOffset := ftabReader.ReadPointer(FieldEntryoffset)
 
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
-	} else {
-		var firstFunc FuncTab12_116_32
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			return nil, ignorelist, err
-		}
-
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			return nil, ignorelist, err
-		}
-
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
+	// Validate: functab's first function should equal minpc value
+	if entryOffset != md.Minpc {
+		// Wrong moduledata, add to ignorelist
+		ignorelist = append(ignorelist, moduleDataVA)
+		return nil, ignorelist, fmt.Errorf("minpc validation failed")
 	}
 
 	// Validation passed, create final ModuleData struct
@@ -676,42 +700,29 @@ func (e *Entry) validateAndConvertModuleData_Legacy_NoTypes(
 ) (*ModuleData, []uint64, error) {
 
 	// Read and validate first function from ftab
-	if is64bit {
-		var firstFunc FuncTab12_116_64
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			return nil, ignorelist, err
-		}
+	ftabSize := functabLayoutLegacy.BaseSize64
+	if !is64bit {
+		ftabSize = functabLayoutLegacy.BaseSize32
+	}
+	
+	ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(ftabSize))
+	if err != nil {
+		return nil, ignorelist, err
+	}
 
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			return nil, ignorelist, err
-		}
+	ftabReader := MemoryReader{
+		Data:         ftab_raw,
+		Layout:       functabLayoutLegacy,
+		Is64Bit:      is64bit,
+		LittleEndian: littleendian,
+	}
+	entryOffset := ftabReader.ReadPointer(FieldEntryoffset)
 
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
-	} else {
-		var firstFunc FuncTab12_116_32
-		ftab_raw, err := e.raw.read_memory(uint64(md.Ftab.Data), uint64(unsafe.Sizeof(firstFunc)))
-		if err != nil {
-			return nil, ignorelist, err
-		}
-
-		err = firstFunc.parse(ftab_raw, littleendian)
-		if err != nil {
-			return nil, ignorelist, err
-		}
-
-		// Validate: functab's first function should equal minpc value
-		if uint64(firstFunc.Entryoffset) != md.Minpc {
-			// Wrong moduledata, add to ignorelist
-			ignorelist = append(ignorelist, moduleDataVA)
-			return nil, ignorelist, fmt.Errorf("minpc validation failed")
-		}
+	// Validate: functab's first function should equal minpc value
+	if entryOffset != md.Minpc {
+		// Wrong moduledata, add to ignorelist
+		ignorelist = append(ignorelist, moduleDataVA)
+		return nil, ignorelist, fmt.Errorf("minpc validation failed")
 	}
 
 	// Validation passed, create final ModuleData struct

@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"github.com/elliotchance/orderedmap"
 	"github.com/mandiant/GoReSym/debug/dwarf"
@@ -902,23 +901,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize)
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				methods.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			} else {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				methods.Data = pvoid64(tmp.Data)
-				methods.Len = uint64(tmp.Len)
-				methods.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			}
 
 			interfaceDef := fmt.Sprintf("type %s interface {", _type.Str)
@@ -999,23 +998,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var methodsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var methods GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				methods.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			} else {
-				data, err := e.raw.read_memory(methodsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(methodsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				methods.Data = pvoid64(tmp.Data)
-				methods.Len = uint64(tmp.Len)
-				methods.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				methods.Data = pvoid64(sliceData)
+				methods.Len = uint64(sliceLen)
+				// Capacity is not used for methods slice
 			}
 
 			interfaceDef := "type interface {"
@@ -1029,23 +1028,21 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			// 	name nameOff // name of method
 			// 	typ  typeOff // .(*FuncType) underneath
 			// }
-			entrySize := uint64(unsafe.Sizeof(IMethod{}))
+			// size = 8 bytes (two int32s)
+			entrySize := uint64(8)
 			for i := 0; i < int(methods.Len); i++ {
 				imethoddata, err := e.raw.read_memory(uint64(methods.Data)+entrySize*uint64(i), entrySize)
 				if err != nil {
 					continue
 				}
 
-				var method IMethod
-				err = method.parse(imethoddata, littleendian)
-				if err != nil {
-					continue
-				}
+				methodNameOff := readInt32(imethoddata, 0, littleendian)
+				methodTypOff := readInt32(imethoddata, 4, littleendian)
 
-				typeAddr := moduleData.Types + uint64(method.Typ)
+				typeAddr := moduleData.Types + uint64(methodTypOff)
 				parsedTypesIn, _ = e.ParseType_impl(runtimeVersion, moduleData, typeAddr, is64bit, littleendian, parsedTypesIn)
 
-				name_ptr := moduleData.Types + uint64(method.Name)
+				name_ptr := moduleData.Types + uint64(methodNameOff)
 				name, err := e.readRTypeName(runtimeVersion, 0, name_ptr, is64bit, littleendian)
 				if err != nil {
 					continue
@@ -1076,23 +1073,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var fieldsStartAddr uint64 = typeAddress + uint64(_type.baseSize)
 			var fields GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				fields.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			} else {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				fields.Data = pvoid64(tmp.Data)
-				fields.Len = uint64(tmp.Len)
-				fields.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			}
 
 			structDef := fmt.Sprintf("type %s struct {", _type.Str)
@@ -1177,23 +1174,23 @@ func (e *Entry) ParseType_impl(runtimeVersion string, moduleData *ModuleData, ty
 			var fieldsStartAddr uint64 = typeAddress + uint64(_type.baseSize) + ptrSize
 			var fields GoSlice64 = GoSlice64{}
 			if is64bit {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice64{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 24)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-				fields.parse(data, littleendian)
+				sliceData, sliceLen := readSlice(data, 0, true, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			} else {
-				data, err := e.raw.read_memory(fieldsStartAddr, uint64(unsafe.Sizeof(GoSlice32{})))
+				data, err := e.raw.read_memory(fieldsStartAddr, 12)
 				if err != nil {
 					return parsedTypesIn, fmt.Errorf("Failed to parse Kind Interface's method slice")
 				}
-
-				var tmp GoSlice32 = GoSlice32{}
-				tmp.parse(data, littleendian)
-
-				fields.Data = pvoid64(tmp.Data)
-				fields.Len = uint64(tmp.Len)
-				fields.Capacity = uint64(tmp.Capacity)
+				sliceData, sliceLen := readSlice(data, 0, false, littleendian)
+				fields.Data = pvoid64(sliceData)
+				fields.Len = uint64(sliceLen)
+				// Capacity is not used for fields slice
 			}
 
 			structDef := "type struct {"
