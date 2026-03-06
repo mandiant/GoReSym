@@ -235,7 +235,7 @@ func IsValidLayoutForRuntime(layoutVersion, runtimeVersion string) bool {
 
 	expectedLayout := runtimeVersion
 	switch runtimeVersion {
-	case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21":
+	case "1.27", "1.26", "1.25", "1.24", "1.23", "1.22", "1.21":
 		expectedLayout = "1.20" // pclntab magic 1.20 is used for 1.20+
 	case "1.20":
 		expectedLayout = "1.20"
