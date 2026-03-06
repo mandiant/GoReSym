@@ -196,6 +196,8 @@ func getModuleDataLayout(runtimeVersion string) *ModuleDataLayout {
 	// Map version to layout name (many versions share layouts)
 	layoutName := runtimeVersion
 	switch runtimeVersion {
+	case "1.27":
+		layoutName = "1.27"
 	case "1.26":
 		layoutName = "1.22"
 	case "1.25", "1.24", "1.23", "1.22", "1.21":
