@@ -74,9 +74,7 @@ https://github.com/mandiant/GoReSym/releases/
 
 ---
 
-## Example Output (Full)
-
-```json
+Example Output (Full)
 {
     "Version": "1.14.15",
     "BuildId": "...",
@@ -87,8 +85,8 @@ https://github.com/mandiant/GoReSym/releases/
     "UserFunctions": [ ... ],
     "StdFunctions": [ ... ]
 }
-Version Support
 
+Version Support
 As the Go compiler and runtime evolve, metadata structures also change.
 
 GoReSym supports:
@@ -104,7 +102,6 @@ Contributions
 Much of the source code is derived from the Go compiler /internal packages, with modifications.
 
 Key notes for contributors:
-
 /internal imports have been rewritten to local paths
 internal structures have been exported for analysis
 changes must preserve compatibility with upstream Go structures
