@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 )
 
 type TaggedStruct struct {
@@ -11,6 +12,12 @@ type TaggedStruct struct {
 	password string `json:"password"`
 	Active   bool
 }
+
+func add(a, b int) int      { return a + b }
+func multiply(a, b int) int { return a * b }
+
+//go:noinline
+func neverInlined(x int) int { return x * x }
 
 func sum(s []int, c chan int) {
 	sum := 0
@@ -43,4 +50,9 @@ func main() {
 
 	x := <-c
 	fmt.Println(x)
+
+	n := len(os.Args)
+	fmt.Println(add(n, 2))
+	fmt.Println(multiply(n, 4))
+	fmt.Println(neverInlined(5))
 }

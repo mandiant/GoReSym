@@ -44,11 +44,18 @@ type PcLnTabMetadata struct {
 	PointerSize   uint32
 }
 
+type InlinedCall struct {
+	Funcname    string
+	CallingPc   uint64
+	ParentEntry uint64
+}
+
 type FuncMetadata struct {
 	Start       uint64
 	End         uint64
 	PackageName string
 	FullName    string
+	InlinedList []InlinedCall
 }
 
 type ExtractMetadata struct {
