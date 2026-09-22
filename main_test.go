@@ -147,6 +147,44 @@ func TestAllVersions(t *testing.T) {
 						}
 					}
 
+					// Positive: main.main's InlinedList must preserve the real parent chain,
+					// not flatten it. main.nestedOuter calls main.nestedInner; the compiler
+					// inlines nestedInner into nestedOuter, then nestedOuter into main.main
+					// -- so nestedInner's *direct* logical parent is nestedOuter's own
+					// InlinedList entry, not main.main. See docs/inline_functions/
+					// parentpc_verification_exercise.md for the by-hand proof this mirrors,
+					// and progress_summary.md's "Maintainer decision on flat vs. tree" for
+					// why this must hold (Steve, 2026-09-13: tree version required).
+					for _, fn := range data.UserFunctions {
+						if fn.FullName == "main.main" {
+							outerIdx, innerIdx := -1, -1
+							for i, inl := range fn.InlinedList {
+								if inl.Funcname == "main.nestedOuter" {
+									outerIdx = i
+								}
+								if inl.Funcname == "main.nestedInner" {
+									innerIdx = i
+								}
+							}
+							if outerIdx == -1 {
+								t.Errorf("Go %s main.nestedOuter not found in main.main InlinedList", v)
+							}
+							if innerIdx == -1 {
+								t.Errorf("Go %s main.nestedInner not found in main.main InlinedList", v)
+							}
+							if outerIdx != -1 && innerIdx != -1 {
+								if fn.InlinedList[outerIdx].ParentIndex != -1 {
+									t.Errorf("Go %s main.nestedOuter.ParentIndex = %d, want -1 (direct parent is main.main itself)",
+										v, fn.InlinedList[outerIdx].ParentIndex)
+								}
+								if fn.InlinedList[innerIdx].ParentIndex != outerIdx {
+									t.Errorf("Go %s main.nestedInner.ParentIndex = %d, want %d (main.nestedOuter's own index -- not flattened to main.main)",
+										v, fn.InlinedList[innerIdx].ParentIndex, outerIdx)
+								}
+							}
+						}
+					}
+
 					// Negative: neverInlined must have empty InlinedList
 					for _, fn := range data.UserFunctions {
 						if fn.FullName == "main.neverInlined" && len(fn.InlinedList) != 0 {

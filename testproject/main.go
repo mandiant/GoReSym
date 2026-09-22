@@ -19,6 +19,29 @@ func multiply(a, b int) int { return a * b }
 //go:noinline
 func neverInlined(x int) int { return x * x }
 
+// nestedInlineSink forces a real memory write inside nestedInner, so its
+// contribution can't be algebraically fused into nestedOuter's own arithmetic
+// and optimized away entirely (this happened on the first attempt at this
+// fixture -- nestedInner's code vanished with no trace to recover).
+var nestedInlineSink int
+
+// nestedInner is small enough to inline, but the store to nestedInlineSink is
+// a real, non-foldable side effect.
+func nestedInner(x int) int {
+	nestedInlineSink = x
+	return x + 1
+}
+
+// nestedOuter calls nestedInner. If both are small enough, the compiler can
+// inline nestedInner into nestedOuter, AND THEN inline that already-inlined
+// copy of nestedOuter into main.main -- this is the "mid-stack inlining" case:
+// nestedInner ends up nested two levels deep inside main.main, with its
+// logical caller being nestedOuter (itself inlined), not main.main directly.
+func nestedOuter(x int) int {
+	y := nestedInner(x)
+	return y * 2
+}
+
 func sum(s []int, c chan int) {
 	sum := 0
 	for _, v := range s {
@@ -55,4 +78,5 @@ func main() {
 	fmt.Println(add(n, 2))
 	fmt.Println(multiply(n, 4))
 	fmt.Println(neverInlined(5))
+	fmt.Println(nestedOuter(n))
 }
