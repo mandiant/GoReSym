@@ -147,7 +147,7 @@ def rename_funcs(items, offset, simulate=False):
             # ' ' is considered as invalid char
             # https://github.com/NationalSecurityAgency/ghidra/blob/c19276091f274a9ef0850c904c743f61c850854e/Ghidra/Framework/SoftwareModeling/src/main/java/ghidra/program/model/symbol/SymbolUtilities.java#L104
             addr, name = func["Start"], func["FullName"].replace(" ", "_")
-            entrypoint = toAddr(addr+offset)
+            entrypoint = toAddr(hex(addr+offset))
 
             f = fm.getFunctionAt(entrypoint)
             if f is None:
@@ -172,7 +172,7 @@ def annotate(items, offset):
     for i in items:
         if i["VA"] != 0:
             # ' ' is considered as invalid char
-            createLabel(toAddr(i["VA"]+offset), i["Str"].replace(" ", "_"), True)
+            createLabel(toAddr(hex(i["VA"]+offset)), i["Str"].replace(" ", "_"), True)
 
 def offset_estimation_sim(hints):
     # Simulate all offset calculation strategies

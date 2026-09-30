@@ -268,11 +268,20 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 		runtimeVersion = parts[0] + "." + parts[1]
 	}
 
+	var runtimeVersions []string
 	if runtimeVersion == "" || runtimeVersion == "unknown" {
-		runtimeVersion = layoutVersion
+		if layoutVersion == "1.20" {
+			// Go 1.20 through 1.25 share the 1.20 moduledata layout.
+			// Go 1.26 introduced epclntab, shifting textsectmap and subsequent fields.
+			// Try 1.20 first to avoid false-positive minpc matches on older binaries,
+			// then fall back to 1.26.
+			runtimeVersions = []string{"1.20", "1.26"}
+		} else {
+			runtimeVersions = []string{layoutVersion}
+		}
+	} else {
+		runtimeVersions = []string{runtimeVersion}
 	}
-
-	// Version validation is now handled inside parseModuleDataGeneric
 
 	var moduleDataCandidate *ModuleDataCandidate = nil
 
@@ -289,119 +298,119 @@ func (e *Entry) ModuleDataTable(pclntabVA uint64, runtimeVersion string, layoutV
 			continue
 		}
 
-		// there's really only a few versions of the structure. Multiple runtime versions share the same binary layout,
-		// with some higher versions using the same layout as versions before it.
-		switch runtimeVersion {
-		case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
-			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
-			if err != nil {
-				continue
+		for _, runtimeVersion := range runtimeVersions {
+			switch runtimeVersion {
+			case "1.26", "1.25", "1.24", "1.23", "1.22", "1.21", "1.20", "1.19", "1.18":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate and convert to final ModuleData struct
+				result, newIgnorelist, err := e.validateAndConvertModuleData(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
+
+			case "1.17", "1.16":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate using 1.16-specific validation (simpler, no textsectmap)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_116(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
+
+			case "1.7":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate using legacy validation (has Types/Etypes/Itablinks)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
+
+			case "1.6", "1.5":
+				// Parse moduledata using generic layout-based parser
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate using legacy validation (no Types field, uses LegacyTypes)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
+
+			default:
+				// Parse moduledata using generic layout-based parser
+				// Default to 1.8 layout for unknown or older versions (1.8 - 1.15)
+				mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
+				if err != nil {
+					continue
+				}
+
+				// Validate using legacy validation (has Types/Etypes/Itablinks/Textsectmap)
+				result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
+					mdIntermediate,
+					moduleDataCandidate.ModuledataVA,
+					is64bit,
+					littleendian,
+					ignorelist,
+				)
+				if err != nil {
+					ignorelist = newIgnorelist
+					continue
+				}
+
+				return secStart, result, nil
 			}
-
-			// Validate and convert to final ModuleData struct
-			result, newIgnorelist, err := e.validateAndConvertModuleData(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
-
-		case "1.17", "1.16":
-			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
-			if err != nil {
-				continue
-			}
-
-			// Validate using 1.16-specific validation (simpler, no textsectmap)
-			result, newIgnorelist, err := e.validateAndConvertModuleData_116(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
-
-		case "1.7":
-			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
-			if err != nil {
-				continue
-			}
-
-			// Validate using legacy validation (has Types/Etypes/Itablinks)
-			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
-
-		case "1.6", "1.5":
-			// Parse moduledata using generic layout-based parser
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
-			if err != nil {
-				continue
-			}
-
-			// Validate using legacy validation (no Types field, uses LegacyTypes)
-			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy_NoTypes(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
-
-		default:
-			// Parse moduledata using generic layout-based parser
-			// Default to 1.8 layout for unknown or older versions (1.8 - 1.15)
-			mdIntermediate, err := parseModuleDataGeneric(moduleDataCandidate.Moduledata, runtimeVersion, layoutVersion, is64bit, littleendian)
-			if err != nil {
-				continue
-			}
-
-			// Validate using legacy validation (has Types/Etypes/Itablinks/Textsectmap)
-			result, newIgnorelist, err := e.validateAndConvertModuleData_Legacy(
-				mdIntermediate,
-				moduleDataCandidate.ModuledataVA,
-				is64bit,
-				littleendian,
-				ignorelist,
-			)
-			if err != nil {
-				ignorelist = newIgnorelist
-				continue
-			}
-
-			return secStart, result, nil
 		}
 	}
 
