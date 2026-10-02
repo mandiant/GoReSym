@@ -561,6 +561,50 @@ func (f funcData) funcdataOffset(i uint32) uint32 {
 	return f.t.Binary.Uint32(f.data[off:])
 }
 
+// pcValueRange is one (value, pcStart, pcEnd) transition decoded from a
+// pc-value delta table -- the value applies to every PC in [pcStart, pcEnd).
+type pcValueRange struct {
+	val     int32
+	pcStart uint64
+	pcEnd   uint64
+}
+
+// decodePcValueRanges walks the same delta-encoded table pcvalue() reads
+// (LEB128 varint + zigzag, via step()), but returns every transition instead
+// of stopping at one target PC. off is the pc-value table offset (e.g. from
+// funcData.pcdataOffset(objabi.PCDATA_InlTreeIndex)) and entry is the
+// function's start PC.
+func (t *LineTable) decodePcValueRanges(off uint32, entry uint64) []pcValueRange {
+	p := t.pctab[off:]
+	var ranges []pcValueRange
+	val := int32(-1)
+	pc := entry
+	for {
+		prevPc := pc
+		if !t.step(&p, &pc, &val, pc == entry) {
+			break
+		}
+		ranges = append(ranges, pcValueRange{val: val, pcStart: prevPc, pcEnd: pc})
+	}
+	return ranges
+}
+
+// countInlineRecords returns the number of InlTree records for a function,
+// computed as max(all non-negative PCDATA_InlTreeIndex values) + 1 -- the
+// same approach Delve uses (maxInlineTreeIndexValue()), since nothing on
+// disk states the record count directly. Verified against hand-decoded
+// data on learning/01_basic_inline and learning/02_runtime_inline; see
+// docs/inline_functions/ghidra_inline_exercise_log.md.
+func countInlineRecords(ranges []pcValueRange) int {
+	max := int32(-1)
+	for _, r := range ranges {
+		if r.val > max {
+			max = r.val
+		}
+	}
+	return int(max) + 1
+}
+
 // field returns the nth field of the _func struct.
 // It panics if n == 0 or n > 9; for n == 0, call f.entryPC.
 // Most callers should use a named field accessor (just above).
