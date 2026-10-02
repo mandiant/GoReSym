@@ -118,6 +118,109 @@ func TestAllVersions(t *testing.T) {
 						t.Errorf("Go %s no Func type with _ptr_ in CStr found", v)
 					}
 
+					// --- Inline function recovery tests ---
+					// Positive: main.main must have inlined functions (add, multiply)
+					for _, fn := range data.UserFunctions {
+						if fn.FullName == "main.main" {
+							if len(fn.InlinedList) == 0 {
+								t.Errorf("Go %s main.main expected inlined functions, got none", v)
+							}
+							found_add := false
+							found_multiply := false
+							for _, inl := range fn.InlinedList {
+								if inl.Funcname == "main.add" {
+									found_add = true
+								}
+								if inl.Funcname == "main.multiply" {
+									found_multiply = true
+								}
+							}
+							if !found_add {
+								t.Errorf("Go %s main.add not found in main.main InlinedList", v)
+							}
+							if !found_multiply {
+								t.Errorf("Go %s main.multiply not found in main.main InlinedList", v)
+							}
+							if len(fn.InlinedList) < 2 {
+								t.Errorf("Go %s main.main expected >= 2 inlines, got %d", v, len(fn.InlinedList))
+							}
+						}
+					}
+
+					// Positive: main.main's InlinedList must preserve the real parent chain,
+					// not flatten it. main.nestedOuter calls main.nestedInner; the compiler
+					// inlines nestedInner into nestedOuter, then nestedOuter into main.main
+					// -- so nestedInner's *direct* logical parent is nestedOuter's own
+					// InlinedList entry, not main.main. See docs/inline_functions/
+					// parentpc_verification_exercise.md for the by-hand proof this mirrors,
+					// and progress_summary.md's "Maintainer decision on flat vs. tree" for
+					// why this must hold (Steve, 2026-09-13: tree version required).
+					for _, fn := range data.UserFunctions {
+						if fn.FullName == "main.main" {
+							outerIdx, innerIdx := -1, -1
+							for i, inl := range fn.InlinedList {
+								if inl.Funcname == "main.nestedOuter" {
+									outerIdx = i
+								}
+								if inl.Funcname == "main.nestedInner" {
+									innerIdx = i
+								}
+							}
+							if outerIdx == -1 {
+								t.Errorf("Go %s main.nestedOuter not found in main.main InlinedList", v)
+							}
+							if innerIdx == -1 {
+								t.Errorf("Go %s main.nestedInner not found in main.main InlinedList", v)
+							}
+							if outerIdx != -1 && innerIdx != -1 {
+								if fn.InlinedList[outerIdx].ParentIndex != -1 {
+									t.Errorf("Go %s main.nestedOuter.ParentIndex = %d, want -1 (direct parent is main.main itself)",
+										v, fn.InlinedList[outerIdx].ParentIndex)
+								}
+								if fn.InlinedList[innerIdx].ParentIndex != outerIdx {
+									t.Errorf("Go %s main.nestedInner.ParentIndex = %d, want %d (main.nestedOuter's own index -- not flattened to main.main)",
+										v, fn.InlinedList[innerIdx].ParentIndex, outerIdx)
+								}
+							}
+						}
+					}
+
+					// Negative: neverInlined must have empty InlinedList
+					for _, fn := range data.UserFunctions {
+						if fn.FullName == "main.neverInlined" && len(fn.InlinedList) != 0 {
+							t.Errorf("Go %s main.neverInlined should have no InlinedList entries", v)
+						}
+					}
+
+					// Negative: validate all InlinedList entries across all functions
+					for _, fn := range data.UserFunctions {
+						seen := map[uint64]bool{}
+						funcSize := fn.End - fn.Start
+						for _, inl := range fn.InlinedList {
+							if inl.Funcname == "" {
+								t.Errorf("Go %s empty Funcname in %s InlinedList", v, fn.FullName)
+							}
+							for _, c := range inl.Funcname {
+								if c < 32 || c > 126 {
+									t.Errorf("Go %s non-printable char in Funcname %q in %s", v, inl.Funcname, fn.FullName)
+								}
+							}
+							if !strings.Contains(inl.Funcname, ".") {
+								t.Errorf("Go %s Funcname %q missing package prefix in %s", v, inl.Funcname, fn.FullName)
+							}
+							if inl.CallingPc >= funcSize {
+								t.Errorf("Go %s CallingPc %x >= funcSize %x in %s", v, inl.CallingPc, funcSize, fn.FullName)
+							}
+							if inl.ParentEntry != fn.Start {
+								t.Errorf("Go %s ParentEntry %x != fn.Start %x in %s", v, inl.ParentEntry, fn.Start, fn.FullName)
+							}
+							if seen[inl.CallingPc] {
+								t.Errorf("Go %s duplicate CallingPc %x in %s", v, inl.CallingPc, fn.FullName)
+							}
+							seen[inl.CallingPc] = true
+						}
+					}
+
 				} else {
 					found_interface := false
 					for _, typ := range data.Types {

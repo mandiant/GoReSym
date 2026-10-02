@@ -523,6 +523,87 @@ func (f funcData) deferreturn() uint32 { return f.field(3) }
 func (f funcData) pcfile() uint32      { return f.field(5) }
 func (f funcData) pcln() uint32        { return f.field(6) }
 func (f funcData) cuOffset() uint32    { return f.field(8) }
+func (f funcData) npcdata() uint32     { return f.field(7) }
+
+// nfuncdata returns the number of funcdata entries. It's a single trailing
+// byte after the _func struct's nine 4-byte fields (funcID/flag/pad precede
+// it), so it can't go through field(), which only covers n <= 9.
+func (f funcData) nfuncdata() uint8 {
+	sz0 := f.t.Ptrsize
+	if f.t.Version >= ver118 {
+		sz0 = 4
+	}
+	return f.data[sz0+39]
+}
+
+// headerSize returns the size of the fixed _func header: sz0 (entry field)
+// + 36 (fields 1-9, 4 bytes each) + 4 (funcID/flag/pad/nfuncdata, 1 byte each).
+// pcdata[] starts here; funcdata[] starts npcdata*4 bytes after that.
+func (f funcData) headerSize() uint32 {
+	sz0 := f.t.Ptrsize
+	if f.t.Version >= ver118 {
+		sz0 = 4
+	}
+	return sz0 + 40
+}
+
+// pcdataOffset returns the offset into t.pctab of the i'th pcdata table
+// (e.g. PCDATA_InlTreeIndex). Sentinel 0xffffffff means absent.
+func (f funcData) pcdataOffset(i uint32) uint32 {
+	off := f.headerSize() + i*4
+	return f.t.Binary.Uint32(f.data[off:])
+}
+
+// funcdataOffset returns the offset into moduledata.GoFunc (go:func.*) of the
+// i'th funcdata blob (e.g. FUNCDATA_InlTree). Sentinel 0xffffffff means absent.
+func (f funcData) funcdataOffset(i uint32) uint32 {
+	off := f.headerSize() + f.npcdata()*4 + i*4
+	return f.t.Binary.Uint32(f.data[off:])
+}
+
+// pcValueRange is one (value, pcStart, pcEnd) transition decoded from a
+// pc-value delta table -- the value applies to every PC in [pcStart, pcEnd).
+type pcValueRange struct {
+	val     int32
+	pcStart uint64
+	pcEnd   uint64
+}
+
+// decodePcValueRanges walks the same delta-encoded table pcvalue() reads
+// (LEB128 varint + zigzag, via step()), but returns every transition instead
+// of stopping at one target PC. off is the pc-value table offset (e.g. from
+// funcData.pcdataOffset(objabi.PCDATA_InlTreeIndex)) and entry is the
+// function's start PC.
+func (t *LineTable) decodePcValueRanges(off uint32, entry uint64) []pcValueRange {
+	p := t.pctab[off:]
+	var ranges []pcValueRange
+	val := int32(-1)
+	pc := entry
+	for {
+		prevPc := pc
+		if !t.step(&p, &pc, &val, pc == entry) {
+			break
+		}
+		ranges = append(ranges, pcValueRange{val: val, pcStart: prevPc, pcEnd: pc})
+	}
+	return ranges
+}
+
+// countInlineRecords returns the number of InlTree records for a function,
+// computed as max(all non-negative PCDATA_InlTreeIndex values) + 1 -- the
+// same approach Delve uses (maxInlineTreeIndexValue()), since nothing on
+// disk states the record count directly. Verified against hand-decoded
+// data on learning/01_basic_inline and learning/02_runtime_inline; see
+// docs/inline_functions/ghidra_inline_exercise_log.md.
+func countInlineRecords(ranges []pcValueRange) int {
+	max := int32(-1)
+	for _, r := range ranges {
+		if r.val > max {
+			max = r.val
+		}
+	}
+	return int(max) + 1
+}
 
 // field returns the nth field of the _func struct.
 // It panics if n == 0 or n > 9; for n == 0, call f.entryPC.

@@ -37,6 +37,8 @@ const (
 	// FuncTab fields
 	FieldEntryoffset // 22
 	FieldFuncoffset  // 23
+	// ModuleData fields (added later)
+	FieldGoFunc // 24 -- go:func.* base (moduledata.gofunc), needed for FUNCDATA_InlTree
 )
 
 // String representation for debugging/logging
@@ -90,6 +92,8 @@ func (f FieldName) String() string {
 		return "Entryoffset"
 	case FieldFuncoffset:
 		return "Funcoffset"
+	case FieldGoFunc:
+		return "GoFunc"
 	default:
 		return "Unknown"
 	}
@@ -280,6 +284,12 @@ var functabLayoutLegacy = &StructLayout{
 // Only fields that GoReSym actually uses are included
 var moduleDataLayouts = map[string]*ModuleDataLayout{
 	"1.22": {
+		// NOTE: this bucket is real Go 1.26 only (see getModuleDataLayout) --
+		// FieldGoFunc offset intentionally omitted here, unverified. The
+		// gap between Etypes and Textsectmap is 8 bytes larger than the
+		// "1.21"/"1.20" buckets, so GoFunc's offset for this bucket is NOT
+		// simply 320/160 -- confirm against a real Go 1.26 binary before
+		// adding it.
 		Version: "1.22",
 		Fields: []FieldInfo{
 			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
@@ -293,6 +303,10 @@ var moduleDataLayouts = map[string]*ModuleDataLayout{
 		},
 	},
 	"1.21": {
+		// Real Go 1.21-1.25 (see getModuleDataLayout). GoFunc offset
+		// verified against runtime/symtab.go's moduledata struct (go1.22.5
+		// source) and empirically against a real binary -- see
+		// docs/inline_functions/ghidra_inline_exercise_log.md.
 		Version: "1.21",
 		Fields: []FieldInfo{
 			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
@@ -303,9 +317,11 @@ var moduleDataLayouts = map[string]*ModuleDataLayout{
 			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164, Type: FieldTypeSlice},
 			{Name: FieldTypelinks, Offset64: 352, Offset32: 176, Type: FieldTypeSlice},
 			{Name: FieldItablinks, Offset64: 376, Offset32: 188, Type: FieldTypeSlice},
+			{Name: FieldGoFunc, Offset64: 320, Offset32: 160, Type: FieldTypePvoid},
 		},
 	},
 	"1.20": {
+		// Real Go 1.20 only. Same field layout as "1.21" bucket.
 		Version: "1.20",
 		Fields: []FieldInfo{
 			{Name: FieldFtab, Offset64: 128, Offset32: 64, Type: FieldTypeSlice},
@@ -315,6 +331,7 @@ var moduleDataLayouts = map[string]*ModuleDataLayout{
 			{Name: FieldEtypes, Offset64: 304, Offset32: 152, Type: FieldTypePvoid},
 			{Name: FieldTextsectmap, Offset64: 328, Offset32: 164, Type: FieldTypeSlice},
 			{Name: FieldTypelinks, Offset64: 352, Offset32: 176, Type: FieldTypeSlice},
+			{Name: FieldGoFunc, Offset64: 320, Offset32: 160, Type: FieldTypePvoid},
 			{Name: FieldItablinks, Offset64: 376, Offset32: 188, Type: FieldTypeSlice},
 		},
 	},
@@ -446,6 +463,7 @@ type ModuleDataIntermediate struct {
 	Textsectmap GoSlice64
 	Typelinks   GoSlice64
 	Itablinks   GoSlice64
+	GoFunc      uint64
 }
 
 // parseModuleDataGeneric parses moduledata from raw bytes using layout tables
@@ -502,6 +520,8 @@ func parseModuleDataGeneric(rawData []byte, runtimeVersion string, layoutVersion
 		case FieldItablinks:
 			data, len := readSlice(rawData, offset, is64bit, littleendian)
 			md.Itablinks = GoSlice64{Data: pvoid64(data), Len: len}
+		case FieldGoFunc:
+			md.GoFunc = readPointer(rawData, offset, is64bit, littleendian)
 		}
 	}
 
@@ -582,6 +602,7 @@ func (e *Entry) validateAndConvertModuleData(
 		ETypes:    md.Etypes,
 		Typelinks: md.Typelinks,
 		ITablinks: md.Itablinks,
+		GoFunc:    md.GoFunc,
 	}
 
 	return result, ignorelist, nil
