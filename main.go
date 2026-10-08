@@ -65,6 +65,7 @@ type ExtractMetadata struct {
 	UserFunctions []FuncMetadata
 	StdFunctions  []FuncMetadata
 	Strings       []objfile.StringEntry
+	Gimphash      string
 }
 
 func main_impl_tmpfile(fileBytes []byte, printStdPkgs bool, printFilePaths bool, printTypes bool, noPrintFunctions bool, manualTypeAddress int, versionOverride string, printStrings bool) (metadata ExtractMetadata, err error) {
@@ -318,6 +319,7 @@ restartParseWithRealTextBase:
 			}
 		}
 	}
+	extractMetadata.Gimphash = calculateGimphash(finalTab.ParsedPclntab.Funcs)
 
 	return extractMetadata, nil
 }
@@ -328,6 +330,7 @@ func printForHuman(metadata ExtractMetadata) {
 	fmt.Printf("%-20s %s\n", "Version:", metadata.Version)
 	fmt.Printf("%-20s %s\n", "Arch:", metadata.Arch)
 	fmt.Printf("%-20s %s\n", "OS:", metadata.OS)
+	fmt.Printf("%-20s %s\n", "Gimphash:", metadata.Gimphash)
 	fmt.Println("\n-BUILD INFO-")
 	fmt.Printf("%-20s %s\n", "GoVersion", metadata.BuildInfo.GoVersion)
 	fmt.Printf("%-20s %s\n", "Path", metadata.BuildInfo.Path)
