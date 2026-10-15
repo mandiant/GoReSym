@@ -111,3 +111,5 @@ func hashFunctionNames(names ...string) string {
 
 	return hex.EncodeToString(hash.Sum(nil))
 }
+
+// hashFunctionNames computes the expected hash for test cases.
