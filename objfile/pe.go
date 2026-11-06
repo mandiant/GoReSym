@@ -177,9 +177,10 @@ func (f *peFile) pcln_scan() (candidates <-chan PclntabCandidate, err error) {
 	ch_tab := make(chan PclntabCandidate)
 
 	send_tab := func(candidate *PclntabCandidate) {
-		if symtab_err != nil {
-			candidate.Symtab = symtab
-			ch_tab <- *candidate
+		if symtab_err == nil && len(symtab) > 0 {
+			candWithSymtab := *candidate
+			candWithSymtab.Symtab = symtab
+			ch_tab <- candWithSymtab
 		}
 		ch_tab <- *candidate
 	}
