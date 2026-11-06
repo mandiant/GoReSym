@@ -157,6 +157,7 @@ type ModuleData struct {
 	ETypes    uint64    // points to end of type information
 	Typelinks GoSlice64 // points to metadata about offsets into types for structures and other types
 	ITablinks GoSlice64 // points to metadata about offsets into types for interfaces
+	GoFunc    uint64    // go:func.* base address; funcdata[FUNCDATA_InlTree] offsets are relative to this
 
 	// Some versions of go with 1.2 moduledata use a slice instead of the types + offset typelinks list
 	LegacyTypes GoSlice64
